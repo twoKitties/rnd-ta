@@ -14,6 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Use these names in code and asset names. `Dog` / `Kitty` / `Parrot` / `Old Man` are already the prefab names in `Assets/_Game/Content/Level/`; the hub is `UFO.prefab` and the level is the scene `Assets/_Game/Content/Scenes/Level.unity`.
 
+**Design docs (Russian).** `DD.md` holds the concept — treat it as the authoritative statement of the design. `MECHANICS.md` is the buildable breakdown: tunable values, per-mechanic authority for the coming multiplayer pass, and Must/Should/Defer tiers. Read `MECHANICS.md` before writing gameplay code, and take numbers from its tunables table rather than inventing them. `.claude/agents/gamemechanics-validator.md` is a read-only reviewer agent that audits mechanics docs against the concept, the 5-hour budget, and this project's Unity constraints.
+
 **Current state (2026-08-01):** greybox / art-assembly stage. There is one level (`Level.unity`), built out of asset-store packs; there is essentially no gameplay code yet (`Bootstrapper.cs` is still the empty Unity template), none of the prefabs carry scripts, and nothing uses AI Navigation. Nothing about the runtime architecture is settled — do not assume one exists, and do not invent one silently. In particular **no netcode package is installed** (`com.unity.multiplayer.center` is only the recommender tool), so the multiplayer stack is an open decision: ask before pulling one in.
 
 ## Layout

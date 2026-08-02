@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2180756708649078445}
   - component: {fileID: 4023341273857167602}
   - component: {fileID: 7816262588388961069}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Lawn
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -157,6 +157,10 @@ PrefabInstance:
       value: WoodSharpFence (24)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -233,6 +237,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (22)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -313,6 +321,10 @@ PrefabInstance:
       value: BrickWall (1)
       objectReference: {fileID: 0}
     - target: {fileID: 2936677434580351834, guid: 85361bd192e684c4aae377722ca1ba24, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 2936677434580351834, guid: 85361bd192e684c4aae377722ca1ba24, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -389,6 +401,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -469,6 +485,10 @@ PrefabInstance:
       value: WoodSharpFence (19)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -545,6 +565,10 @@ PrefabInstance:
     - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
       propertyPath: m_Name
       value: BrickWall1
+      objectReference: {fileID: 0}
+    - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -625,6 +649,10 @@ PrefabInstance:
       value: WoodSharpFence (2)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -701,6 +729,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (23)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -781,6 +813,10 @@ PrefabInstance:
       value: WoodSharpFence (10)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -857,6 +893,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -937,6 +977,10 @@ PrefabInstance:
       value: WoodSharpFence (11)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1013,6 +1057,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (20)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1093,6 +1141,10 @@ PrefabInstance:
       value: WoodSharpFence (6)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1169,6 +1221,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (5)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1249,6 +1305,10 @@ PrefabInstance:
       value: WoodSharpFence (8)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1325,6 +1385,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (13)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1405,6 +1469,10 @@ PrefabInstance:
       value: BrickWall
       objectReference: {fileID: 0}
     - target: {fileID: 2936677434580351834, guid: 85361bd192e684c4aae377722ca1ba24, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 2936677434580351834, guid: 85361bd192e684c4aae377722ca1ba24, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1479,6 +1547,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 5623636620766472491}
     m_Modifications:
     - target: {fileID: 586121804635776725, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 586121804635776725, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1535,12 +1607,20 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5081425286336923527, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5081425286336923527, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 6042725910561529719, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
       propertyPath: m_Name
       value: BrickDoorway
+      objectReference: {fileID: 0}
+    - target: {fileID: 6042725910561529719, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6042725910561529719, guid: 2e89d7af03d805743a562245da1d3354, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1567,6 +1647,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1647,6 +1731,10 @@ PrefabInstance:
       value: WoodSharpFence (18)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1723,6 +1811,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (17)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1803,6 +1895,10 @@ PrefabInstance:
       value: WoodSharpFence (14)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -1879,6 +1975,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (15)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -1959,6 +2059,10 @@ PrefabInstance:
       value: WoodSharpFence (7)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -2035,6 +2139,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (16)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -2115,6 +2223,10 @@ PrefabInstance:
       value: WoodFencePillar
       objectReference: {fileID: 0}
     - target: {fileID: 1988242110020943049, guid: 84d4fbca7c5fff945b81d633ce9c84b3, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 1988242110020943049, guid: 84d4fbca7c5fff945b81d633ce9c84b3, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -2191,6 +2303,10 @@ PrefabInstance:
     - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
       propertyPath: m_Name
       value: BrickWall1 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 310873775704038034, guid: e7c16a06f82aeae498a1e2b1b963726e, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -2271,6 +2387,10 @@ PrefabInstance:
       value: WoodSharpFence (9)
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -2347,6 +2467,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (21)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
@@ -2427,6 +2551,10 @@ PrefabInstance:
       value: WoodSharpFence
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
@@ -2503,6 +2631,10 @@ PrefabInstance:
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_Name
       value: WoodSharpFence (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
+      propertyPath: m_Layer
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 6780170203180481154, guid: 7efe4dceef3587247b54b5501f1fb5ab, type: 3}
       propertyPath: m_StaticEditorFlags

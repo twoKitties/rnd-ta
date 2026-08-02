@@ -23,6 +23,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 409751081883940656}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
@@ -35,13 +36,13 @@ Transform:
   - {fileID: 405185821441456345}
   - {fileID: 2416587269174351969}
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &558906688668942899
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 2416587269174351969}
     m_Modifications:
     - target: {fileID: 1383750416692036285, guid: 08f110985fcd3b148b2f4fea2a9672d0, type: 3}
@@ -93,12 +94,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 08f110985fcd3b148b2f4fea2a9672d0, type: 3}
+--- !u!4 &7419476359792671612 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7005037906052675919, guid: 08f110985fcd3b148b2f4fea2a9672d0, type: 3}
+  m_PrefabInstance: {fileID: 558906688668942899}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1534521142607549108
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 2416587269174351969}
     m_Modifications:
     - target: {fileID: 402358825243817778, guid: bb536d71135f8414f8f7cefd7734a23b, type: 3}
@@ -150,12 +160,21 @@ PrefabInstance:
       value: Interior_Door_HingesA
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bb536d71135f8414f8f7cefd7734a23b, type: 3}
+--- !u!4 &1215622121944098182 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 402358825243817778, guid: bb536d71135f8414f8f7cefd7734a23b, type: 3}
+  m_PrefabInstance: {fileID: 1534521142607549108}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &2137440607313772488
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 4332682439126214569, guid: c7049498fdae1fa4992800082e31571c, type: 3}
@@ -207,6 +226,18 @@ PrefabInstance:
       value: Interior_Door
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 4332682439126214569, guid: c7049498fdae1fa4992800082e31571c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4514782174130458180}
+    - targetCorrespondingSourceObject: {fileID: 4332682439126214569, guid: c7049498fdae1fa4992800082e31571c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1215622121944098182}
+    - targetCorrespondingSourceObject: {fileID: 4332682439126214569, guid: c7049498fdae1fa4992800082e31571c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7419476359792671612}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c7049498fdae1fa4992800082e31571c, type: 3}
 --- !u!4 &2416587269174351969 stripped
 Transform:
@@ -218,6 +249,7 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 1689754212655276317, guid: c249fc6e3f813f14dbe21617804ed17f, type: 3}
@@ -268,7 +300,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Interior_Door_HingesB
       objectReference: {fileID: 0}
+    - target: {fileID: 3782923492805815927, guid: c249fc6e3f813f14dbe21617804ed17f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c249fc6e3f813f14dbe21617804ed17f, type: 3}
 --- !u!4 &4012682531162364538 stripped
 Transform:
@@ -280,6 +319,7 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 1441022106872026548, guid: fd8b729894a4dcd4d99f0341ca83926b, type: 3}
@@ -330,7 +370,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Interior_Door_Wall
       objectReference: {fileID: 0}
+    - target: {fileID: 6528623062914581328, guid: fd8b729894a4dcd4d99f0341ca83926b, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fd8b729894a4dcd4d99f0341ca83926b, type: 3}
 --- !u!4 &8315291277755972476 stripped
 Transform:
@@ -342,15 +389,20 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 3514311049965971752, guid: 56ee302379118a64982ab1105fedfdc0, type: 3}
-      propertyPath: m_Materials.Array.data[0]
+      propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 9d9fecfc9d43da2418f88eca6c235fcf, type: 2}
     - target: {fileID: 3653895078253476013, guid: 56ee302379118a64982ab1105fedfdc0, type: 3}
       propertyPath: m_Name
       value: Interior_Door_WallB
+      objectReference: {fileID: 0}
+    - target: {fileID: 3653895078253476013, guid: 56ee302379118a64982ab1105fedfdc0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 4926356134537457098, guid: 56ee302379118a64982ab1105fedfdc0, type: 3}
       propertyPath: m_RootOrder
@@ -397,6 +449,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 56ee302379118a64982ab1105fedfdc0, type: 3}
 --- !u!4 &3171661482899393009 stripped
 Transform:
@@ -408,6 +463,7 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 2416587269174351969}
     m_Modifications:
     - target: {fileID: 1444540159997871375, guid: 0d2eb644e66ba054c94ace55f6a4fa8e, type: 3}
@@ -459,12 +515,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0d2eb644e66ba054c94ace55f6a4fa8e, type: 3}
+--- !u!4 &4514782174130458180 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6326279174329956964, guid: 0d2eb644e66ba054c94ace55f6a4fa8e, type: 3}
+  m_PrefabInstance: {fileID: 7596674354539967520}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7841033062898810507
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 3049627835970429735, guid: fac9889ae8b01ec46af185dfdc0115b0, type: 3}
@@ -515,7 +580,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Interior_Door_Frame
       objectReference: {fileID: 0}
+    - target: {fileID: 8190687850893291645, guid: fac9889ae8b01ec46af185dfdc0115b0, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fac9889ae8b01ec46af185dfdc0115b0, type: 3}
 --- !u!4 &5080771063718354348 stripped
 Transform:
@@ -527,11 +599,16 @@ PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
+    serializedVersion: 3
     m_TransformParent: {fileID: 8498816880434209736}
     m_Modifications:
     - target: {fileID: 6093378202129190585, guid: 5f5fd3c2188df8f43a4b5a648002990f, type: 3}
       propertyPath: m_Name
       value: Interior_Door_Baseboard
+      objectReference: {fileID: 0}
+    - target: {fileID: 6093378202129190585, guid: 5f5fd3c2188df8f43a4b5a648002990f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
       objectReference: {fileID: 0}
     - target: {fileID: 9099550944236827174, guid: 5f5fd3c2188df8f43a4b5a648002990f, type: 3}
       propertyPath: m_RootOrder
@@ -578,6 +655,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 5f5fd3c2188df8f43a4b5a648002990f, type: 3}
 --- !u!4 &405185821441456345 stripped
 Transform:

@@ -1,16 +1,8 @@
 using UnityEngine;
 
-public class Bootstrapper : MonoBehaviour
+namespace _Game.Code
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+    public class Bootstrapper : MonoBehaviour
+    {   
     }
 }

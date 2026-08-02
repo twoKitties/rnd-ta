@@ -576,6 +576,7 @@ GameObject:
   - component: {fileID: 4286413578327955056}
   - component: {fileID: 8384983679888264017}
   - component: {fileID: 8720415816767902971}
+  - component: {fileID: 453437188438686483}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -664,10 +665,30 @@ MonoBehaviour:
   walkSpeed: 2.5
   sprintSpeed: 5
   cameraRoot: {fileID: 8386403753130933884}
+  body: {fileID: 453437188438686483}
   lookSensitivity: 0.12
   pitchLimit: 85
   gravity: -9.81
   groundedStick: -1
+  jumpHeight: 0.15
+--- !u!114 &453437188438686483
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 073adb482b0b591498ad529fbe3837ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.FirstPersonBody
+  hiddenInFirstPerson:
+  - {fileID: 4840827032495428698}
+  - {fileID: 6728609463522448696}
+  - {fileID: 2749203435249547001}
+  - {fileID: 1811626567098865985}
+  - {fileID: 4499018194745119731}
 --- !u!1 &2422957392122321474
 GameObject:
   m_ObjectHideFlags: 0

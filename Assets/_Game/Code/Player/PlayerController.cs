@@ -29,12 +29,14 @@ namespace _Game.Code.Player
 
         [Header("Look")]
         [SerializeField] private Transform cameraRoot;
+        [SerializeField] private FirstPersonBody body;
         [SerializeField] private float lookSensitivity = 0.12f;
         [SerializeField] private float pitchLimit = 85f;
 
-        [Header("Gravity")]
+        [Header("Gravity and jump")]
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float groundedStick = -1f;
+        [SerializeField] private float jumpHeight = 0.15f;
 
         /// <summary>Current movement state. Block 2 reads this to derive noise.</summary>
         public MoveState State { get; private set; } = MoveState.Idle;
@@ -51,6 +53,17 @@ namespace _Game.Code.Player
         {
             _controller = GetComponent<CharacterController>();
             _input = new InputSystem_Actions();
+        }
+
+        private void Start()
+        {
+            // This component only ever drives the avatar the local player looks
+            // through, so reaching the first-person view from here is the ownership
+            // check. Once netcode lands, gate it on "is the local avatar" instead.
+            if (body != null)
+            {
+                body.ApplyFirstPersonView();
+            }
         }
 
         private void OnEnable()
@@ -114,16 +127,25 @@ namespace _Game.Code.Player
                 direction.Normalize();
             }
 
-            if (_controller.isGrounded && _verticalVelocity < 0f)
+            if (_controller.isGrounded)
             {
-                // A small downward bias keeps the capsule in contact with the floor,
-                // so isGrounded stays true instead of flickering on every step.
-                _verticalVelocity = groundedStick;
+                if (_verticalVelocity < 0f)
+                {
+                    // A small downward bias keeps the capsule in contact with the floor,
+                    // so isGrounded stays true instead of flickering on every step.
+                    _verticalVelocity = groundedStick;
+                }
+
+                if (_input.Player.Jump.WasPressedThisFrame())
+                {
+                    // Launch speed that peaks at exactly jumpHeight: v = sqrt(2 * g * h).
+                    // Deriving it from the height keeps the tunable in metres, so it stays
+                    // meaningful if gravity is ever retuned for this character's scale.
+                    _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
+                }
             }
-            else
-            {
-                _verticalVelocity += gravity * Time.deltaTime;
-            }
+
+            _verticalVelocity += gravity * Time.deltaTime;
 
             var velocity = direction * Speed + Vector3.up * _verticalVelocity;
             _controller.Move(velocity * Time.deltaTime);

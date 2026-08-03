@@ -102,6 +102,9 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 192
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 640
 --- !u!1 &424588581323309775
 GameObject:
   m_ObjectHideFlags: 0

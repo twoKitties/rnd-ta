@@ -1,5 +1,6 @@
 using _Game.Code.Player;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace _Game.Code.Pets
 {
@@ -44,6 +45,9 @@ namespace _Game.Code.Pets
 
         // Floor and walls, for finding ground under the drop spot.
         [SerializeField] private LayerMask groundMask;
+
+        [Tooltip("What the animal must not be pushed or dropped through: BlockedArea + Door.")]
+        [SerializeField] private LayerMask obstacleMask;
 
         /// <summary>How much the carrier slows down while holding this one.</summary>
         public float CarrySpeedMultiplier => carrySpeedMultiplier;
@@ -139,8 +143,46 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            transform.position = anchor.position;
+            transform.position = ClampedCarryPosition(anchor);
             transform.rotation = Quaternion.Euler(0f, anchor.eulerAngles.y, 0f);
+        }
+
+        /// <summary>
+        /// Where the load can actually ride this frame. The anchor sits 0.4 m in front
+        /// of the carrier, so walking into a wall would otherwise hold the animal a
+        /// quarter of a metre inside it; the same check keeps an overhead Dog out of
+        /// low doorways. The load slides back towards its carrier instead.
+        /// </summary>
+        private Vector3 ClampedCarryPosition(Transform anchor)
+        {
+            var radius = BodyRadius();
+            var centre = BodyCentreHeight();
+
+            // Cast from inside the carrier's own capsule: that point is free by
+            // definition, which a point on the floor is not.
+            var from = Carrier.transform.position + Vector3.up * centre;
+            var to = anchor.position + Vector3.up * centre;
+            var travel = to - from;
+            var distance = travel.magnitude;
+            if (distance < 0.0001f)
+            {
+                return anchor.position;
+            }
+
+            // A line, not a sphere cast: a sphere the size of a Kitty already overlaps
+            // the wall when the carrier stands against it, and an overlapping sphere
+            // cast reports no hit at all — measured, and it is exactly how the animal
+            // ended up on the far side. The carrier's own middle is never inside a
+            // wall, so a line from there is reliable; the body radius is subtracted
+            // afterwards to keep the animal clear of the surface.
+            var direction = travel / distance;
+            if (Physics.Linecast(from, to, out var hit, obstacleMask, QueryTriggerInteraction.Ignore))
+            {
+                var stop = Mathf.Max(0f, hit.distance - radius);
+                return from + direction * stop - Vector3.up * centre;
+            }
+
+            return anchor.position;
         }
 
         // The state change itself. This is the line a netcode pass will drive from
@@ -181,22 +223,69 @@ namespace _Game.Code.Pets
             }
         }
 
+        /// <summary>
+        /// Where the animal may be put down. Dropping it blindly a fixed distance
+        /// ahead would push it straight through a wall the carrier is facing — and an
+        /// animal left in a room nobody can reach makes the raid unwinnable, since the
+        /// win needs all three aboard. So the spot is walked to, not assumed.
+        /// </summary>
         private Vector3 FindDropPosition(Transform carrier)
         {
-            var ahead = carrier.position + carrier.forward * dropDistance;
+            var radius = BodyRadius();
+            var centre = BodyCentreHeight();
+            var from = carrier.position + Vector3.up * centre;
 
-            // Drop spots are chosen from above: the carrier may be standing on the
-            // porch step or in a doorway, and the floor under their feet is not
-            // necessarily the floor half a metre ahead.
-            var from = ahead + Vector3.up;
-            if (Physics.Raycast(from, Vector3.down, out var hit, 3f, groundMask, QueryTriggerInteraction.Ignore))
+            // 1. how far ahead can this body actually travel before something stops it.
+            // A line rather than a sphere cast, for the reason spelled out in
+            // ClampedCarryPosition: an overlapping sphere cast reports nothing.
+            var distance = dropDistance;
+            if (Physics.Linecast(from, from + carrier.forward * dropDistance, out var blocker, obstacleMask, QueryTriggerInteraction.Ignore))
             {
-                return hit.point;
+                distance = Mathf.Max(0f, blocker.distance - radius - 0.02f);
             }
 
-            // No floor ahead (a doorway onto the yard, a hole): drop at the carrier's
-            // own feet, which are on solid ground by definition.
-            return carrier.position;
+            var ahead = from + carrier.forward * distance;
+
+            // 2. the floor under that spot, found from above: the carrier may be on a
+            // step or in a doorway, and the floor under their feet is not necessarily
+            // the floor half a metre ahead.
+            if (!Physics.Raycast(ahead + Vector3.up, Vector3.down, out var ground, 3f + centre, groundMask, QueryTriggerInteraction.Ignore))
+            {
+                return carrier.position;
+            }
+
+            var spot = ground.point;
+
+            // 3. is the body actually free there — the sphere cast only checked the
+            // path, not whether the end of it is inside something.
+            if (Physics.CheckSphere(spot + Vector3.up * centre, radius * 0.95f, obstacleMask, QueryTriggerInteraction.Ignore))
+            {
+                return carrier.position;
+            }
+
+            // 4. last guard: it must be somewhere an animal could later walk out of.
+            // Block 4 puts these on NavMeshAgents, so "not on the navmesh" means "lost".
+            if (!NavMesh.SamplePosition(spot, out var navHit, 0.5f, NavMesh.AllAreas))
+            {
+                return carrier.position;
+            }
+
+            // Snap back down: the navmesh floats a couple of centimetres over the floor.
+            return Physics.Raycast(navHit.position + Vector3.up * 0.5f, Vector3.down, out var settle, 1.5f, groundMask, QueryTriggerInteraction.Ignore)
+                ? settle.point
+                : spot;
+        }
+
+        /// <summary>The animal's own radius in world metres — no new tunable needed.</summary>
+        private float BodyRadius()
+        {
+            return _controller == null ? 0.1f : _controller.radius * Mathf.Abs(transform.lossyScale.x);
+        }
+
+        /// <summary>Height of the body's middle above its feet, in world metres.</summary>
+        private float BodyCentreHeight()
+        {
+            return _controller == null ? 0.1f : _controller.center.y * Mathf.Abs(transform.lossyScale.y);
         }
     }
 }

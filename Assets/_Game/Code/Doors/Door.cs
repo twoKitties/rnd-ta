@@ -1,3 +1,4 @@
+using _Game.Code.Noise;
 using UnityEngine;
 
 namespace _Game.Code.Doors
@@ -16,6 +17,10 @@ namespace _Game.Code.Doors
         [Header("Swing (MECHANICS.md section 2)")]
         [SerializeField] private float openAngle = 90f;
         [SerializeField] private float swingSpeed = 220f;
+
+        [Header("Noise (MECHANICS.md section 2)")]
+        [Tooltip("As loud as a step: above Old Man's threshold, below the animals'.")]
+        [SerializeField] private float useNoise = 25f;
 
         /// <summary>
         /// True once the leaf has been asked to open. The pets' AI (block 4) reads
@@ -41,6 +46,16 @@ namespace _Game.Code.Doors
         /// </summary>
         public void Use(Transform actor)
         {
+            // The noise belongs to whoever pulled the handle, not to the leaf:
+            // MECHANICS.md 7.5 keeps noise on actors. The side effect is the right
+            // one — Old Man walks to where the player stood, not to where the leaf
+            // hangs. An actor with no emitter (Old Man himself) opens doors quietly.
+            var noise = actor.GetComponent<NoiseEmitter>();
+            if (noise != null)
+            {
+                noise.Emit(useNoise);
+            }
+
             if (IsOpen)
             {
                 _targetAngle = 0f;

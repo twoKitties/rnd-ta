@@ -48,6 +48,9 @@ namespace _Game.Code.Pets
         /// <summary>How much the carrier slows down while holding this one.</summary>
         public float CarrySpeedMultiplier => carrySpeedMultiplier;
 
+        /// <summary>Where this one rides. The carrier's animator matches its pose to it.</summary>
+        public CarryPose Pose => carryPose;
+
         /// <summary>The hands holding this animal, or null. One carrier at a time.</summary>
         public PlayerHands Carrier { get; private set; }
 

@@ -974,7 +974,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerAnimator
   animator: {fileID: 4286413578327955056}
+  hands: {fileID: 5935024523324181470}
   damping: 0.12
+  carryFade: 0.2
 --- !u!1 &2255835499259793941
 GameObject:
   m_ObjectHideFlags: 0

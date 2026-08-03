@@ -1124,6 +1124,7 @@ GameObject:
   - component: {fileID: 42368039978819699}
   - component: {fileID: 3249983043302229399}
   - component: {fileID: 7069719313753342858}
+  - component: {fileID: 1441837510528057596}
   m_Layer: 0
   m_Name: Kitty
   m_TagString: Untagged
@@ -1195,6 +1196,25 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1441837510528057596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7681027589497803214}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27859a5202fff214194d3e866e66e8ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Pets.Pet
+  carrySpeedMultiplier: 0.85
+  carryPose: 1
+  captureDistance: 1.5
+  dropDistance: 0.6
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 192
 --- !u!1 &7889374281285759929
 GameObject:
   m_ObjectHideFlags: 0

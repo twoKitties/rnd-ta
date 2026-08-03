@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3943575738941309012}
   - component: {fileID: 7669227372075630906}
   - component: {fileID: 4301874712382505920}
+  - component: {fileID: 4845868812369302487}
   m_Layer: 0
   m_Name: Dog
   m_TagString: Untagged
@@ -82,6 +83,25 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &4845868812369302487
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 202121160631726732}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27859a5202fff214194d3e866e66e8ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Pets.Pet
+  carrySpeedMultiplier: 0.65
+  carryPose: 0
+  captureDistance: 1.5
+  dropDistance: 0.6
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 192
 --- !u!1 &424588581323309775
 GameObject:
   m_ObjectHideFlags: 0

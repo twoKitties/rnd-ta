@@ -27,6 +27,9 @@ namespace _Game.Code.Player
         [SerializeField] private float walkSpeed = 2.5f;
         [SerializeField] private float sprintSpeed = 5f;
 
+        [Header("Carrying")]
+        [SerializeField] private PlayerHands hands;
+
         [Header("Look")]
         [SerializeField] private Transform cameraRoot;
         [SerializeField] private FirstPersonBody body;
@@ -41,7 +44,12 @@ namespace _Game.Code.Player
         /// <summary>Current movement state. Block 2 reads this to derive noise.</summary>
         public MoveState State { get; private set; } = MoveState.Idle;
 
-        /// <summary>Horizontal speed the state asks for, m/s. Zero while Idle.</summary>
+        /// <summary>
+        /// Horizontal speed actually being applied, m/s — the state's speed times
+        /// whatever the player is carrying. Zero while Idle. Block 2 must not read
+        /// this for noise: noise comes from <see cref="State"/>, so hauling a Dog
+        /// makes a player slow but no quieter.
+        /// </summary>
         public float Speed { get; private set; }
 
         /// <summary>
@@ -127,6 +135,13 @@ namespace _Game.Code.Player
                 MoveState.Sprint => sprintSpeed,
                 _ => 0f
             };
+
+            // The load is the price of the trophy: Dog x0.65, Kitty x0.85, Parrot x1
+            // (MECHANICS.md section 2).
+            if (hands != null)
+            {
+                Speed *= hands.SpeedMultiplier;
+            }
 
             var direction = transform.right * input.x + transform.forward * input.y;
             if (direction.sqrMagnitude > 1f)

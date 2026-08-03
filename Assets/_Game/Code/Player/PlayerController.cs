@@ -24,9 +24,9 @@ namespace _Game.Code.Player
     public class PlayerController : MonoBehaviour
     {
         [Header("Speed, m/s (MECHANICS.md section 2)")]
-        [SerializeField] private float crouchSpeed = 1.2f;
-        [SerializeField] private float walkSpeed = 2.5f;
-        [SerializeField] private float sprintSpeed = 5f;
+        [SerializeField] private float crouchSpeed = 1f;
+        [SerializeField] private float walkSpeed = 1.4f;
+        [SerializeField] private float sprintSpeed = 4f;
 
         [Header("Carrying")]
         [SerializeField] private PlayerHands hands;

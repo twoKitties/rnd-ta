@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using _Game.Code.AI;
 using _Game.Code.Level;
+using _Game.Code.Noise;
+using _Game.Code.Pets;
 using _Game.Code.Player;
 using _Game.Code.Spawning;
 using _Game.Code.UI;
@@ -39,7 +42,22 @@ namespace _Game.Code
 
         public GameObject OldMan { get; private set; }
 
+        /// <summary>
+        /// The players as the AI sees them. Built once here so that no brain does
+        /// GetComponent in Update and none of them searches the scene (7.6).
+        /// </summary>
+        public IReadOnlyList<SensedPlayer> SensedPlayers => _sensedPlayers;
+
+        /// <summary>
+        /// Everything that can make a noise a listener might react to: the players and
+        /// the animals. Old Man is not here — he has no emitter, so he cannot hear
+        /// himself open a door.
+        /// </summary>
+        public IReadOnlyList<NoiseEmitter> NoiseSources => _noiseSources;
+
         private readonly List<GameObject> _pets = new List<GameObject>();
+        private readonly List<SensedPlayer> _sensedPlayers = new List<SensedPlayer>();
+        private readonly List<NoiseEmitter> _noiseSources = new List<NoiseEmitter>();
 
         private void Awake()
         {
@@ -66,6 +84,59 @@ namespace _Game.Code
             OldMan = oldMen.Count > 0 ? oldMen[0] : null;
 
             BindGoal(players);
+            BindBrains(players);
+        }
+
+        // Everything the AI needs to know about the rest of the level. Pushed in from
+        // here rather than looked up, for the same reason as BindGoal: an actor is a
+        // spawned prefab and cannot hold a reference to another spawned prefab.
+        private void BindBrains(IReadOnlyList<GameObject> players)
+        {
+            for (var i = 0; i < players.Count; i++)
+            {
+                if (players[i] == null)
+                {
+                    continue;
+                }
+
+                _sensedPlayers.Add(new SensedPlayer(players[i]));
+                CollectNoiseSource(players[i]);
+            }
+
+            for (var i = 0; i < _pets.Count; i++)
+            {
+                if (_pets[i] == null)
+                {
+                    continue;
+                }
+
+                CollectNoiseSource(_pets[i]);
+            }
+
+            // A second pass over the animals, after every source is in the list: a Dog
+            // must be able to hear a Parrot that was created after it.
+            for (var i = 0; i < _pets.Count; i++)
+            {
+                if (_pets[i] == null)
+                {
+                    continue;
+                }
+
+                var brain = _pets[i].GetComponent<PetBrain>();
+                if (brain != null)
+                {
+                    brain.Bind(_sensedPlayers, _noiseSources);
+                }
+            }
+        }
+
+        private void CollectNoiseSource(GameObject actor)
+        {
+            var emitter = actor.GetComponent<NoiseEmitter>();
+            if (emitter != null)
+            {
+                _noiseSources.Add(emitter);
+            }
         }
 
         // The goal and the beam are scene objects, so a spawned avatar cannot hold a

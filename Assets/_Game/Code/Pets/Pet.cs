@@ -58,17 +58,29 @@ namespace _Game.Code.Pets
         /// <summary>The hands holding this animal, or null. One carrier at a time.</summary>
         public PlayerHands Carrier { get; private set; }
 
-        private CharacterController _controller;
+        // The CharacterController the asset pack shipped was removed in block 4:
+        // it and the agent both claim the transform, and together they give jitter or
+        // total stillness (MECHANICS.md 4.1). The capsule stays behind as a plain
+        // collider — it is what puts the animal on the Pet layer for the interactor's
+        // search, and what stops a player from walking through it.
+        private NavMeshAgent _agent;
+        private CapsuleCollider _capsule;
+
+        // How far a failed Warp may look for legal ground, world metres. Not a
+        // tunable: it is a rescue for a case that should not happen, and a wider
+        // search would teleport the animal somewhere the player did not put it.
+        private const float RescueRadius = 1f;
 
         // Kept apart from the Carrier reference on purpose: if the carrier is
         // destroyed — shot by Old Man (3.7), or gone from the session — the
         // reference goes fake-null while the animal is still mid-air with its
-        // controller off. This flag is what notices and puts it down.
+        // agent off. This flag is what notices and puts it down.
         private bool _isCarried;
 
         private void Awake()
         {
-            _controller = GetComponent<CharacterController>();
+            _agent = GetComponent<NavMeshAgent>();
+            _capsule = GetComponent<CapsuleCollider>();
         }
 
         /// <summary>
@@ -100,11 +112,18 @@ namespace _Game.Code.Pets
 
         /// <summary>
         /// Handed over to the saucer: off the level and counted (MECHANICS.md 4.5).
-        /// Lives here rather than in LevelGoal so that block 4's NavMeshAgent gets
-        /// switched off in the same place everything else about this animal is.
+        /// Lives here rather than in LevelGoal so that the NavMeshAgent gets switched
+        /// off in the same place everything else about this animal is.
         /// </summary>
         public void Deliver()
         {
+            if (_agent != null)
+            {
+                // Before the object goes inactive, not after: an agent switched off
+                // while already disabled never unregisters from the crowd simulation.
+                _agent.enabled = false;
+            }
+
             gameObject.SetActive(false);
         }
 
@@ -193,12 +212,19 @@ namespace _Game.Code.Pets
             _isCarried = true;
             hands.Take(this);
 
-            // The controller and the carry both want to drive the transform; leaving
-            // it on makes the animal jitter or refuse to move at all. The NavMeshAgent
-            // of block 4 will have to be switched off in exactly the same place.
-            if (_controller != null)
+            // The agent and the carry both want to drive the transform; leaving it on
+            // makes the animal jitter or refuse to move at all.
+            if (_agent != null)
             {
-                _controller.enabled = false;
+                _agent.enabled = false;
+            }
+
+            // The collider goes with it: the load rides 0.4 m in front of a carrier
+            // whose own body is 0.12 m wide, so a live collider there would shove its
+            // own carrier around.
+            if (_capsule != null)
+            {
+                _capsule.enabled = false;
             }
         }
 
@@ -215,11 +241,31 @@ namespace _Game.Code.Pets
 
             transform.position = position;
 
-            if (_controller != null)
+            if (_capsule != null)
             {
-                // Re-enabled after the move: an enabled CharacterController caches its
-                // own position and would drag the animal back.
-                _controller.enabled = true;
+                _capsule.enabled = true;
+            }
+
+            if (_agent != null)
+            {
+                // Re-enabled after the move, and warped rather than just switched on:
+                // an agent keeps its own idea of where it is, and would drag the animal
+                // back to wherever it was picked up.
+                _agent.enabled = true;
+                if (!_agent.Warp(position))
+                {
+                    // Warp reports failure and still moves the transform — measured
+                    // 2026-08-03: warping 5 m into the air returned false, moved the
+                    // animal there anyway and left isOnNavMesh false, which strands it
+                    // for good. FindDropPosition validates its own spot, but the branch
+                    // above does not: an animal whose carrier was shot falls wherever it
+                    // happened to be. So the nearest navmesh position is the fallback.
+                    NavMeshHit navHit;
+                    if (NavMesh.SamplePosition(position, out navHit, RescueRadius, NavMesh.AllAreas))
+                    {
+                        _agent.Warp(navHit.position);
+                    }
+                }
             }
         }
 
@@ -276,16 +322,22 @@ namespace _Game.Code.Pets
                 : spot;
         }
 
-        /// <summary>The animal's own radius in world metres — no new tunable needed.</summary>
+        /// <summary>
+        /// The animal's own radius in world metres — no new tunable needed. Read from
+        /// the capsule rather than from the agent: the capsule is the body physics
+        /// actually collides with, and it is what these two wall checks are about.
+        /// Both values are local on the collider and scale with the transform, which
+        /// is what makes the Parrot's 0.3 prefab scale come out right.
+        /// </summary>
         private float BodyRadius()
         {
-            return _controller == null ? 0.1f : _controller.radius * Mathf.Abs(transform.lossyScale.x);
+            return _capsule == null ? 0.1f : _capsule.radius * Mathf.Abs(transform.lossyScale.x);
         }
 
         /// <summary>Height of the body's middle above its feet, in world metres.</summary>
         private float BodyCentreHeight()
         {
-            return _controller == null ? 0.1f : _controller.center.y * Mathf.Abs(transform.lossyScale.y);
+            return _capsule == null ? 0.1f : _capsule.center.y * Mathf.Abs(transform.lossyScale.y);
         }
     }
 }

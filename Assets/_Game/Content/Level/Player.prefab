@@ -866,9 +866,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 748ee71c949b327478c10a0a730c4f38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerController
-  crouchSpeed: 1.2
-  walkSpeed: 2.5
-  sprintSpeed: 5
+  crouchSpeed: 1
+  walkSpeed: 1.4
+  sprintSpeed: 4
   hands: {fileID: 5935024523324181470}
   cameraRoot: {fileID: 8386403753130933884}
   body: {fileID: 453437188438686483}

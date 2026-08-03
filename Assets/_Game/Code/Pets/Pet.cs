@@ -91,6 +91,16 @@ namespace _Game.Code.Pets
             return true;
         }
 
+        /// <summary>
+        /// Handed over to the saucer: off the level and counted (MECHANICS.md 4.5).
+        /// Lives here rather than in LevelGoal so that block 4's NavMeshAgent gets
+        /// switched off in the same place everything else about this animal is.
+        /// </summary>
+        public void Deliver()
+        {
+            gameObject.SetActive(false);
+        }
+
         /// <summary>Puts the animal back on the floor and frees both slots.</summary>
         public void Release()
         {

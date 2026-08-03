@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using _Game.Code.Level;
+using _Game.Code.Player;
 using _Game.Code.Spawning;
+using _Game.Code.UI;
 using UnityEngine;
 
 namespace _Game.Code
@@ -22,6 +25,7 @@ namespace _Game.Code
 
         [Header("Scene")]
         [SerializeField] private Transform spawnsRoot;
+        [SerializeField] private LevelGoal levelGoal;
 
         [Header("Spawning")]
         [Tooltip("0 draws a fresh layout every run; any other value repeats the same one.")]
@@ -60,6 +64,37 @@ namespace _Game.Code
 
             var oldMen = spawner.Spawn(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
             OldMan = oldMen.Count > 0 ? oldMen[0] : null;
+
+            BindGoal(players);
+        }
+
+        // The goal and the beam are scene objects, so a spawned avatar cannot hold a
+        // reference to them up front — the entry point hands it over instead.
+        private void BindGoal(IReadOnlyList<GameObject> players)
+        {
+            if (levelGoal == null)
+            {
+                return;
+            }
+
+            levelGoal.Bind(players, _pets);
+
+            if (Player == null)
+            {
+                return;
+            }
+
+            var interactor = Player.GetComponent<PlayerInteractor>();
+            if (interactor != null)
+            {
+                interactor.Bind(levelGoal);
+            }
+
+            var status = Player.GetComponentInChildren<LevelStatusUI>(true);
+            if (status != null)
+            {
+                status.Bind(levelGoal);
+            }
         }
 
         private static List<Transform> PointsOf(IReadOnlyList<SpawnPoint> points, SpawnKind kind)

@@ -1,4 +1,5 @@
 using _Game.Code.Doors;
+using _Game.Code.Level;
 using _Game.Code.Pets;
 using UnityEngine;
 
@@ -72,11 +73,21 @@ namespace _Game.Code.Player
         private PlayerController _controller;
         private Pet _pet;
         private Door _door;
+        private LevelGoal _goal;
         private readonly Collider[] _nearbyPets = new Collider[8];
 
         private void Awake()
         {
             _controller = GetComponent<PlayerController>();
+        }
+
+        /// <summary>
+        /// Handed over by Bootstrapper right after this avatar is spawned: the goal
+        /// is a scene object, so a spawned prefab cannot reference it up front.
+        /// </summary>
+        public void Bind(LevelGoal goal)
+        {
+            _goal = goal;
         }
 
         private void Update()
@@ -96,6 +107,12 @@ namespace _Game.Code.Player
                     if (hands.IsEmpty)
                     {
                         _pet.TryTake(hands);
+                    }
+                    else if (_goal != null)
+                    {
+                        // Through the goal, because putting an animal down inside the
+                        // beam is how it is handed over (MECHANICS.md 4.5).
+                        _goal.ReleaseCarried(hands);
                     }
                     else
                     {

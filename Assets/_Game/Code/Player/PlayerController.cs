@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace _Game.Code.Player
 {
@@ -58,6 +59,15 @@ namespace _Game.Code.Player
         /// second InputSystem_Actions — see MECHANICS.md 7.1.
         /// </summary>
         public bool InteractPressedThisFrame => _input.Player.Interact.WasPressedThisFrame();
+
+        /// <summary>
+        /// The Interact button's name for the HUD — "E" on a keyboard. Comes from the
+        /// bindings, so it follows the .inputactions asset instead of being retyped
+        /// in the UI. DontIncludeInteractions strips the "Hold " the asset's own
+        /// interaction would otherwise prepend.
+        /// </summary>
+        public string InteractDisplayName =>
+            _input.Player.Interact.GetBindingDisplayString(0, InputBinding.DisplayStringOptions.DontIncludeInteractions);
 
         private CharacterController _controller;
         private InputSystem_Actions _input;

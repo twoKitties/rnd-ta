@@ -303,7 +303,7 @@ GameObject:
   - component: {fileID: 1240325586030840240}
   - component: {fileID: 6979784439368316734}
   - component: {fileID: 6931736145573967285}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Parrot
   m_TagString: Untagged
   m_Icon: {fileID: 0}

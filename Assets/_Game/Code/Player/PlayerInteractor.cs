@@ -4,9 +4,37 @@ using UnityEngine;
 
 namespace _Game.Code.Player
 {
+    public enum InteractionKind
+    {
+        None,
+        Pet,
+        Door
+    }
+
     /// <summary>
-    /// Turns the player's Interact press into a request against whatever is in
-    /// front of them: an animal to pick up or put down, or a door to work.
+    /// What Interact would do right now. The verb and the subject are semantic —
+    /// the name of the button belongs to the UI, not to the simulation
+    /// (MECHANICS.md 7.1).
+    /// </summary>
+    public readonly struct InteractionTarget
+    {
+        public readonly InteractionKind Kind;
+        public readonly string Verb;
+        public readonly string Subject;
+
+        public InteractionTarget(InteractionKind kind, string verb, string subject)
+        {
+            Kind = kind;
+            Verb = verb;
+            Subject = subject;
+        }
+
+        public bool Exists => Kind != InteractionKind.None;
+    }
+
+    /// <summary>
+    /// Works out what is available in front of the player each frame, and acts on it
+    /// when Interact is pressed: an animal to pick up or put down, or a door.
     /// Distances come from MECHANICS.md section 2.
     /// </summary>
     [RequireComponent(typeof(PlayerController))]
@@ -27,12 +55,24 @@ namespace _Game.Code.Player
         // it, or animals inside their own capture distance never get found.
         [SerializeField] private float petSearchRadius = 2f;
 
+        [Header("Masks")]
         // Door + BlockedArea. BlockedArea is in the mask so that a door cannot be
         // used through a wall — the ray stops on the frame first. The same mask
         // stops an animal from being grabbed through a wall.
         [SerializeField] private LayerMask blockers;
 
+        // Just the Pet layer. Measured 2026-08-03: an unmasked query returns up to 57
+        // colliders in a furnished room, and this one runs every frame to feed the
+        // prompt. Masked it can only ever return the three animals.
+        [SerializeField] private LayerMask petMask;
+
+        /// <summary>What Interact would do this frame. Read by the HUD.</summary>
+        public InteractionTarget Current { get; private set; }
+
         private PlayerController _controller;
+        private Pet _pet;
+        private Door _door;
+        private readonly Collider[] _nearbyPets = new Collider[8];
 
         private void Awake()
         {
@@ -41,64 +81,101 @@ namespace _Game.Code.Player
 
         private void Update()
         {
-            if (!_controller.InteractPressedThisFrame || hands == null || lookSource == null)
+            Resolve();
+
+            if (!_controller.InteractPressedThisFrame)
             {
                 return;
             }
 
-            // Hands full: the press puts the animal down, and nothing else is
-            // available while carrying — MECHANICS.md 3.4.
+            switch (Current.Kind)
+            {
+                case InteractionKind.Pet:
+                    // Hands full means this is the animal being carried, and the press
+                    // puts it down; otherwise it is the one in front of the player.
+                    if (hands.IsEmpty)
+                    {
+                        _pet.TryTake(hands);
+                    }
+                    else
+                    {
+                        hands.Carried.Release();
+                    }
+
+                    break;
+
+                case InteractionKind.Door:
+                    _door.Use(transform);
+                    break;
+            }
+        }
+
+        private void Resolve()
+        {
+            _pet = null;
+            _door = null;
+
+            if (hands == null || lookSource == null)
+            {
+                Current = default;
+                return;
+            }
+
+            // Carrying: the only thing on offer is putting the animal down. Doors are
+            // not available with full hands — MECHANICS.md 3.4.
             if (!hands.IsEmpty)
             {
-                hands.Carried.Release();
+                Current = new InteractionTarget(InteractionKind.Pet, "Release", hands.Carried.name);
                 return;
             }
 
-            // An animal beats a door on purpose: the animal is running away, the
-            // door will wait.
-            var pet = FindPet();
-            if (pet != null)
+            // An animal beats a door on purpose: the animal is running away, the door
+            // will wait.
+            _pet = FindPet();
+            if (_pet != null)
             {
-                pet.TryTake(hands);
+                Current = new InteractionTarget(InteractionKind.Pet, "Grab", _pet.name);
                 return;
             }
 
-            if (!Physics.Raycast(lookSource.position, lookSource.forward, out var hit, reach, blockers, QueryTriggerInteraction.Ignore))
+            _door = FindDoor();
+            if (_door != null)
             {
+                Current = new InteractionTarget(InteractionKind.Door, _door.IsOpen ? "Close" : "Open", "door");
                 return;
             }
 
-            var door = hit.collider.GetComponent<Door>();
-            if (door == null)
+            Current = default;
+        }
+
+        private Door FindDoor()
+        {
+            if (!Physics.Raycast(lookSource.position, lookSource.forward, out var hit, reach, blockers,
+                    QueryTriggerInteraction.Ignore))
             {
-                return;
+                return null;
             }
 
-            door.Use(transform);
+            return hit.collider.GetComponent<Door>();
         }
 
         /// <summary>
-        /// Nearest animal within the capture distance that is in front of the player
-        /// and not behind a wall. By radius rather than by a ray: MECHANICS.md sizes
-        /// the capture as a distance, and a fleeing Parrot is 17 cm of target.
+        /// Nearest animal within reach that is in front of the player and not behind a
+        /// wall. By radius rather than by a ray: MECHANICS.md sizes the capture as a
+        /// distance, and a fleeing Parrot is 17 cm of target.
         /// </summary>
         private Pet FindPet()
         {
-            // The allocating overload on purpose. The NonAlloc one needs a fixed
-            // buffer, and measured 2026-08-03 a furnished room puts 26-29 colliders
-            // inside this radius: with a 16-slot buffer the animal itself landed at
-            // index 23-27 and was never seen. This query runs on a button press, not
-            // per frame, so one small array is the cheaper mistake.
-            var nearby = Physics.OverlapSphere(transform.position, petSearchRadius, ~0,
-                QueryTriggerInteraction.Ignore);
+            var count = Physics.OverlapSphereNonAlloc(transform.position, petSearchRadius, _nearbyPets,
+                petMask, QueryTriggerInteraction.Ignore);
 
             Pet best = null;
             var bestDistance = float.MaxValue;
             var eye = lookSource.position;
 
-            foreach (var collider in nearby)
+            for (var i = 0; i < count; i++)
             {
-                var pet = collider.GetComponentInParent<Pet>();
+                var pet = _nearbyPets[i].GetComponentInParent<Pet>();
                 if (pet == null || !pet.CanBeTakenBy(hands))
                 {
                     continue;

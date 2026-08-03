@@ -1125,7 +1125,7 @@ GameObject:
   - component: {fileID: 3249983043302229399}
   - component: {fileID: 7069719313753342858}
   - component: {fileID: 1441837510528057596}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Kitty
   m_TagString: Untagged
   m_Icon: {fileID: 0}

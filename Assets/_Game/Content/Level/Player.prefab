@@ -778,6 +778,7 @@ GameObject:
   - component: {fileID: 3828167182167701776}
   - component: {fileID: 5466929205855753393}
   - component: {fileID: 3317138996795760983}
+  - component: {fileID: 7540516874012160512}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -815,8 +816,8 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2239553874488288769}
   m_Enabled: 1
-  m_Avatar: {fileID: 9000000, guid: 150b771c021f45d48873c0d8caddd485, type: 3}
-  m_Controller: {fileID: 0}
+  m_Avatar: {fileID: 9000000, guid: 88ae3008d401fbb47af95549e29f65e1, type: 2}
+  m_Controller: {fileID: 9100000, guid: 60d170d1696651742905d78bd5a30179, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -960,6 +961,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.UI.LevelStatusUI
   counter: {fileID: 6167188679444603274}
   result: {fileID: 7013812758737678864}
+--- !u!114 &7540516874012160512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce855561a3a315f41be8978910f73702, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerAnimator
+  animator: {fileID: 4286413578327955056}
+  damping: 0.12
 --- !u!1 &2255835499259793941
 GameObject:
   m_ObjectHideFlags: 0
@@ -1050,7 +1065,7 @@ GameObject:
   - component: {fileID: 8968348642862779568}
   - component: {fileID: 2749203435249547001}
   m_Layer: 0
-  m_Name: Head
+  m_Name: HeadMesh
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -6,6 +6,7 @@ TagManager:
   tags:
   - PetSpawn
   - OldmanSpawn
+  - PatrolPoint
   layers:
   - Default
   - TransparentFX

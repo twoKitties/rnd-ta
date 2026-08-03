@@ -44,6 +44,13 @@ namespace _Game.Code.Player
         /// <summary>Horizontal speed the state asks for, m/s. Zero while Idle.</summary>
         public float Speed { get; private set; }
 
+        /// <summary>
+        /// True on the frame Interact went down. This component owns the avatar's
+        /// input, so other systems read the intent from here instead of opening a
+        /// second InputSystem_Actions — see MECHANICS.md 7.1.
+        /// </summary>
+        public bool InteractPressedThisFrame => _input.Player.Interact.WasPressedThisFrame();
+
         private CharacterController _controller;
         private InputSystem_Actions _input;
         private float _pitch;

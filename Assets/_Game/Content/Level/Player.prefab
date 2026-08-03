@@ -577,6 +577,8 @@ GameObject:
   - component: {fileID: 8384983679888264017}
   - component: {fileID: 8720415816767902971}
   - component: {fileID: 453437188438686483}
+  - component: {fileID: 5935024523324181470}
+  - component: {fileID: 3828167182167701776}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -689,6 +691,37 @@ MonoBehaviour:
   - {fileID: 2749203435249547001}
   - {fileID: 1811626567098865985}
   - {fileID: 4499018194745119731}
+--- !u!114 &5935024523324181470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14896179a251a4144b777f5e20e6ade7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerHands
+  carried: {fileID: 0}
+--- !u!114 &3828167182167701776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ee1e16bae159f342b799167bbb7c167, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerInteractor
+  lookSource: {fileID: 8386403753130933884}
+  hands: {fileID: 5935024523324181470}
+  reach: 1.5
+  blockers:
+    serializedVersion: 2
+    m_Bits: 640
 --- !u!1 &2422957392122321474
 GameObject:
   m_ObjectHideFlags: 0

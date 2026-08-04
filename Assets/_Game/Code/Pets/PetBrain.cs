@@ -44,10 +44,15 @@ namespace _Game.Code.Pets
     ///    Afraid means: it always is (the Parrot), or it distrusts, or the player is
     ///    moving upright. A player who sneaks or stands still and is trusted may walk
     ///    right up to it — that is the entire luring mechanic.
-    /// 4. Seen player further off → alert: it turns and watches, and stops wandering.
-    /// 5. Heard something ≥ its threshold → the species' reaction. Proximity always
-    ///    beats noise (4.3), which is why this is below the two checks above.
+    /// 4. Seen player further off → alert: it turns and watches.
+    /// 5. Heard something ≥ its threshold → the species' reaction. Sight always beats
+    ///    noise (4.1, 4.3), which is why this is below both checks above.
     /// 6. Nothing for the calm-down time → idle.
+    ///
+    /// Across all of that: a seen player sprinting straight at the animal makes it
+    /// give voice (4.4), whether it is standing its ground or already running. The
+    /// bark is noise like a step, so charging an animal is what brings Old Man —
+    /// walking up to the same animal is not.
     ///
     /// Sight is directional on purpose: an animal has a cone, so a player can come up
     /// behind it at any speed. That is the counterpart of never being able to
@@ -73,6 +78,10 @@ namespace _Game.Code.Pets
 
         [Tooltip("Noise at or above this is reacted to. The animals' threshold is deliberately above a step.")]
         [SerializeField] private float hearingThreshold = 30f;
+
+        [Tooltip("Full angle of the wedge a sprint counts as a charge in. A player running " +
+                 "at the animal inside it gets barked at (MECHANICS.md 4.4).")]
+        [SerializeField] private float chargeCone = 60f;
 
         [Header("Speeds, m/s (MECHANICS.md section 2)")]
         [SerializeField] private float fleeSpeed = 3.2f;
@@ -147,6 +156,10 @@ namespace _Game.Code.Pets
         private bool _wasCarried;
         private Vector3 _noiseSpot;
 
+        // Who it backed away from, kept so a cornered animal can go on turning to face
+        // them between two repaths.
+        private Vector3 _corneredFrom;
+
         /// <summary>What it is doing. Read by measurements and by the animator.</summary>
         public PetState State { get; private set; } = PetState.Idle;
 
@@ -183,9 +196,23 @@ namespace _Game.Code.Pets
             // The voice still runs — a Dog whines all the way to the saucer.
             if (_pet.Carrier != null)
             {
-                if (!_wasCarried && _voice != null)
+                if (!_wasCarried)
                 {
-                    _voice.Caught();
+                    if (_voice != null)
+                    {
+                        _voice.Caught();
+                    }
+
+                    // The legs are stopped once, here, and not every frame: DriveAnimator
+                    // never runs while the animal is carried, so the two floats keep
+                    // whatever the last frame on the ground left in them. An animal
+                    // grabbed at a run went on running in mid-air over its carrier's head
+                    // the whole way to the saucer, which in first person is right in view.
+                    if (_animator != null)
+                    {
+                        _animator.SetFloat(VertParameter, 0f);
+                        _animator.SetFloat(StateParameter, 0f);
+                    }
                 }
 
                 _wasCarried = true;
@@ -222,6 +249,17 @@ namespace _Game.Code.Pets
         private void Think()
         {
             var threat = NearestSeenPlayer();
+
+            // Someone running straight at it: it gives voice, in whatever state it is
+            // in (4.4). PetVoice paces the repeats with its own cooldown, and an animal
+            // with no clip in the slot stays completely silent.
+            if (threat != null && _voice != null && IsChargedBy(threat))
+            {
+                _voice.Noticed();
+            }
+
+            CheckDoorAhead();
+
             var afraid = threat != null && IsAfraidOf(threat) &&
                          HorizontalDistance(threat.Transform.position) <= panicRadius;
 
@@ -273,7 +311,17 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            // Proximity beat noise above; from here down, noise gets its turn.
+            // Sight beats noise (4.1): an animal that can see the player watches them
+            // rather than walking towards the racket they are making. Out here, past
+            // the panic radius, that racket is usually the player's own sprint — the
+            // other order had the animal trot towards the very thing it was warning
+            // about, which is what this ring exists to warn about.
+            if (threat != null)
+            {
+                EnterAlert(threat);
+                return;
+            }
+
             var heard = Hearing.Loudest(_noiseSources, transform.position, hearingThreshold, _ownNoise);
             if (heard != null)
             {
@@ -287,13 +335,62 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            if (threat != null)
+            EnterIdle();
+        }
+
+        /// <summary>
+        /// Somebody sprinting into this animal rather than merely sprinting nearby.
+        /// Judged by the player's own velocity and not by the distance closing: a
+        /// player running a circle around the animal closes on it for half of every
+        /// lap, and would otherwise be barked at for going past.
+        /// </summary>
+        private bool IsChargedBy(SensedPlayer player)
+        {
+            if (!player.IsRunning)
             {
-                EnterAlert(threat);
+                return false;
+            }
+
+            var run = player.Velocity;
+            if (run.sqrMagnitude < 0.0001f)
+            {
+                return false;
+            }
+
+            var towards = transform.position - player.Transform.position;
+            towards.y = 0f;
+            if (towards.sqrMagnitude < 0.0001f)
+            {
+                return true;
+            }
+
+            return Vector3.Angle(run, towards) <= chargeCone * 0.5f;
+        }
+
+        /// <summary>
+        /// A door shut across the route it is already walking. DoorGate is asked when a
+        /// route is built and never again, but a player can close a leaf in front of a
+        /// running animal — and at flee speed it covers over a metre between two
+        /// repaths, straight through the leaf, because the navmesh ignores doors (4.6).
+        ///
+        /// One probe as far as the next corner is enough: it does not decide anything,
+        /// it only brings the repath forward, and the flee fan then rejects the blocked
+        /// way itself. A door further along the path is caught by the repath that was
+        /// due anyway.
+        /// </summary>
+        private void CheckDoorAhead()
+        {
+            if (_agent.isStopped || _agent.pathPending || !_agent.hasPath || Time.time >= _repathAt)
+            {
                 return;
             }
 
-            EnterIdle();
+            var lift = Vector3.up * pathProbeHeight;
+            if (DoorGate.FirstClosedDoorBetween(transform.position + lift, _agent.steeringTarget + lift,
+                    doorMask, _doorHits) != null)
+            {
+                _repathAt = 0f;
+            }
         }
 
         private bool IsAfraidOf(SensedPlayer player)
@@ -395,13 +492,11 @@ namespace _Game.Code.Pets
             return target;
         }
 
+        // The voice is not raised here: an animal notices a crouching player too, and
+        // barking at one would bring Old Man to the very approach the crouch is meant
+        // to buy. Charging it is what it answers, and that is decided in Think.
         private void EnterAlert(SensedPlayer player)
         {
-            if (State != PetState.Alert && _voice != null)
-            {
-                _voice.Noticed();
-            }
-
             State = PetState.Alert;
             Stop();
             FaceTowards(player.Transform.position);
@@ -430,7 +525,25 @@ namespace _Game.Code.Pets
         {
             _agent.speed = fleeSpeed;
 
-            if (Time.time < _repathAt && State == PetState.Flee)
+            // Turning stays outside the gate below. FaceTowards is one RotateTowards
+            // step of angularSpeed × deltaTime, so running it only on repath frames
+            // would turn the animal at a fortieth of its own turn rate: a cornered
+            // Parrot would take seconds to come round and face the player it is
+            // cowering from, and read as a frozen animation.
+            if (State == PetState.Cornered)
+            {
+                // The live position when there is one: _corneredFrom is only written on
+                // repath frames, so following it alone would have the animal turning
+                // towards where the player was up to half a second ago and catching up
+                // in jerks. It stays as the fallback for the calls that pass no threat.
+                FaceTowards(threat == null ? _corneredFrom : threat.Transform.position);
+            }
+
+            // Cornered is gated too, and that is the point of naming it here: it is the
+            // state in which nothing changes, so leaving it out would run the whole fan
+            // — seven directions, each a SamplePosition, a CalculatePath and a door
+            // sweep — every single frame for as long as the animal stays in its corner.
+            if (Time.time < _repathAt && (State == PetState.Flee || State == PetState.Cornered))
             {
                 return;
             }
@@ -444,6 +557,7 @@ namespace _Game.Code.Pets
                 // Nowhere to go: it is in a corner or behind a shut door it cannot open.
                 // It stops and can be picked up — this is how a Parrot is caught.
                 State = PetState.Cornered;
+                _corneredFrom = from;
                 Stop();
                 FaceTowards(from);
                 return;

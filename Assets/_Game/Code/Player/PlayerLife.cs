@@ -1,3 +1,4 @@
+using _Game.Code.Level;
 using UnityEngine;
 
 namespace _Game.Code.Player
@@ -24,6 +25,18 @@ namespace _Game.Code.Player
         /// <summary>True once this avatar has been shot. LevelGoal counts the living.</summary>
         public bool IsDead { get; private set; }
 
+        private LevelGoal _goal;
+
+        /// <summary>
+        /// Handed over by Bootstrapper right after this avatar is spawned, the same
+        /// way PlayerInteractor is: the goal is a scene object, so a spawned prefab
+        /// cannot reference it up front (MECHANICS.md 7.6).
+        /// </summary>
+        public void Bind(LevelGoal goal)
+        {
+            _goal = goal;
+        }
+
         /// <summary>
         /// Kill this avatar. Idempotent: a second shot in the same frame — two
         /// listeners, or the host confirming what the client already showed — must not
@@ -43,13 +56,21 @@ namespace _Game.Code.Player
         {
             IsDead = true;
 
-            // The animal falls where it is and goes back to fleeing — except inside the
-            // beam, where LevelGoal's rule still applies. Pet.Release is what knows the
-            // difference, so it is asked rather than reimplemented here.
+            // The animal is put down through the goal rather than straight through
+            // Pet.Release, because a carrier shot inside the beam still hands it over
+            // (MECHANICS.md 3.7) and LevelGoal is the only thing that knows where the
+            // beam is. Unbound — a scene without a goal — it just drops.
             var hands = GetComponent<PlayerHands>();
             if (hands != null && !hands.IsEmpty)
             {
-                hands.Carried.Release();
+                if (_goal != null)
+                {
+                    _goal.ReleaseCarried(hands);
+                }
+                else
+                {
+                    hands.Carried.Release();
+                }
             }
 
             for (var i = 0; i < disableOnDeath.Length; i++)

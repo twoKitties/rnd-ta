@@ -3116,6 +3116,7 @@ MonoBehaviour:
   - {fileID: 3194756889528111688, guid: 1413704134d081d4fb272916785f3fa0, type: 3}
   oldManPrefab: {fileID: 3706920364051464488, guid: 11621cc3af68338478b89995dea8da9c, type: 3}
   spawnsRoot: {fileID: 1463552535}
+  patrolRoot: {fileID: 672977424}
   levelGoal: {fileID: 1694328862}
   seed: 0
 --- !u!4 &1694328861

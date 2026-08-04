@@ -58,6 +58,18 @@ namespace _Game.Code.Pets
         /// <summary>The hands holding this animal, or null. One carrier at a time.</summary>
         public PlayerHands Carrier { get; private set; }
 
+        /// <summary>
+        /// Where somebody should aim a line at this animal: the middle of its body,
+        /// not its feet. Asked of the animal rather than worked out by the caller,
+        /// because the body is this class's own knowledge — the same
+        /// <see cref="BodyCentreHeight"/> the two wall checks use.
+        ///
+        /// A ray at floor level is stopped by the first skirting board or blanket,
+        /// which is exactly how a Kitty standing by the bed became impossible to pick
+        /// up.
+        /// </summary>
+        public Vector3 AimPoint => transform.position + Vector3.up * BodyCentreHeight();
+
         // The CharacterController the asset pack shipped was removed in block 4:
         // it and the agent both claim the transform, and together they give jitter or
         // total stillness (MECHANICS.md 4.1). The capsule stays behind as a plain
@@ -70,6 +82,14 @@ namespace _Game.Code.Pets
         // tunable: it is a rescue for a case that should not happen, and a wider
         // search would teleport the animal somewhere the player did not put it.
         private const float RescueRadius = 1f;
+
+        // How far the drop spot may be off the navmesh and still be accepted, world
+        // metres. Deliberately stricter than the animals' own tunable of the same
+        // shape (MECHANICS.md section 2, "радиус приёма точки навмеша"): that one
+        // picks where an animal runs to, this one decides where a player is allowed
+        // to leave it, and a metre of slack there is a metre the animal was never put
+        // down at. Not a tunable, for the same reason RescueRadius is not.
+        private const float DropSampleRadius = 0.5f;
 
         // Kept apart from the Carrier reference on purpose: if the carrier is
         // destroyed — shot by Old Man (3.7), or gone from the session — the
@@ -265,6 +285,14 @@ namespace _Game.Code.Pets
                     {
                         _agent.Warp(navHit.position);
                     }
+                    else
+                    {
+                        // Not even a rescue point: the agent goes back off rather than
+                        // being left switched on and off the mesh, where it logs an
+                        // error a frame and its brain bails out for ever (4.1). A still
+                        // animal beats an uncontrollable one.
+                        _agent.enabled = false;
+                    }
                 }
             }
         }
@@ -302,7 +330,7 @@ namespace _Game.Code.Pets
 
             var spot = ground.point;
 
-            // 3. is the body actually free there — the sphere cast only checked the
+            // 3. is the body actually free there — the line above only checked the
             // path, not whether the end of it is inside something.
             if (Physics.CheckSphere(spot + Vector3.up * centre, radius * 0.95f, obstacleMask, QueryTriggerInteraction.Ignore))
             {
@@ -311,7 +339,7 @@ namespace _Game.Code.Pets
 
             // 4. last guard: it must be somewhere an animal could later walk out of.
             // Block 4 puts these on NavMeshAgents, so "not on the navmesh" means "lost".
-            if (!NavMesh.SamplePosition(spot, out var navHit, 0.5f, NavMesh.AllAreas))
+            if (!NavMesh.SamplePosition(spot, out var navHit, DropSampleRadius, NavMesh.AllAreas))
             {
                 return carrier.position;
             }

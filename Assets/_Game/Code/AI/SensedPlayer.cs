@@ -9,6 +9,10 @@ namespace _Game.Code.AI
     /// no brain does GetComponent in Update and none of them searches the scene
     /// (MECHANICS.md 7.6).
     ///
+    /// LevelGoal reads it too, for <see cref="IsAlive"/> and <see cref="Transform"/>:
+    /// "who is still playing" has to mean the same thing to the outcome as it does to
+    /// the animals, or a player could be dead to Old Man and alive to the win check.
+    ///
     /// A plain class rather than a component: it describes somebody else's avatar, so
     /// it must not live on it. Nothing per-player is stored here beyond the
     /// references — the avatar's own components stay the source of truth.
@@ -48,6 +52,35 @@ namespace _Game.Code.AI
         public bool IsQuiet => State == MoveState.Crouch || State == MoveState.Idle;
 
         /// <summary>
+        /// Sprinting. The other end of the same scale as <see cref="IsQuiet"/>, and it
+        /// lives here for the same reason: which MoveState means what is this class's
+        /// knowledge, so a brain never compares against the enum itself.
+        /// </summary>
+        public bool IsRunning => State == MoveState.Sprint;
+
+        /// <summary>
+        /// Where they are actually going, world m/s, flattened. Read off the
+        /// CharacterController rather than differenced between frames, so it is the
+        /// same vector the controller moved them by; the vertical part is dropped
+        /// because falling is not running at anybody.
+        /// </summary>
+        public Vector3 Velocity
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            get
+            {
+                if (_body == null)
+                {
+                    return Vector3.zero;
+                }
+
+                var velocity = _body.velocity;
+                velocity.y = 0f;
+                return velocity;
+            }
+        }
+
+        /// <summary>
         /// A dead player scares nobody and is not worth shooting again. The avatar
         /// stays in the scene as a spectator camera, so being switched off is not the
         /// test — PlayerLife is.
@@ -64,6 +97,24 @@ namespace _Game.Code.AI
                 }
 
                 return _life == null || !_life.IsDead;
+            }
+        }
+
+        /// <summary>
+        /// Shot by Old Man: instant death, no respawn (MECHANICS.md 5.2 and 3.7).
+        /// Routed through here so his brain never reaches for a component on somebody
+        /// else's avatar, and does nothing to an avatar with no PlayerLife.
+        ///
+        /// Under 7.4 this is the host's decision — a client does not decide it was
+        /// seen — and PlayerLife.Kill is already idempotent, so a confirmation
+        /// arriving after the local shot changes nothing.
+        /// </summary>
+        public void Kill()
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (_life != null)
+            {
+                _life.Kill();
             }
         }
 

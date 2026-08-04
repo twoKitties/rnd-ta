@@ -781,6 +781,7 @@ GameObject:
   - component: {fileID: 7540516874012160512}
   - component: {fileID: 5260468799113887754}
   - component: {fileID: 5878062049126280672}
+  - component: {fileID: 4579252125903846854}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1009,6 +1010,21 @@ MonoBehaviour:
   crouchNoise: 8
   walkNoise: 25
   sprintNoise: 60
+--- !u!114 &4579252125903846854
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8ef7268c9c1b96418d7e164e602353a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerLife
+  disableOnDeath:
+  - {fileID: 8720415816767902971}
+  - {fileID: 3828167182167701776}
 --- !u!1 &2255835499259793941
 GameObject:
   m_ObjectHideFlags: 0

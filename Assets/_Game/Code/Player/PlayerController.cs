@@ -101,6 +101,15 @@ namespace _Game.Code.Player
         {
             _input.Player.Disable();
             Cursor.lockState = CursorLockMode.None;
+
+            // Move stops running, so State and Speed would keep their last values for
+            // good. Everything downstream reads them: a player shot mid-sprint would
+            // go on emitting sprint noise from PlayerNoise — walking Old Man to a
+            // corpse for the rest of the match — and walking on the spot in
+            // PlayerAnimator. Clearing them here means death needs no special case in
+            // either.
+            State = MoveState.Idle;
+            Speed = 0f;
         }
 
         private void OnDestroy()

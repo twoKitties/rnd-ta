@@ -90,6 +90,16 @@ namespace _Game.Code.Player
             _goal = goal;
         }
 
+        // Switched off on death (PlayerLife). Resolve stops running, so the last
+        // target would stay on offer and the HUD would keep showing "[E] Grab Kitty"
+        // over a corpse — the exact "the button does nothing" reading the prompt was
+        // added to prevent. Nothing can actually be interacted with anyway: the
+        // press is read through PlayerController, whose actions are disabled too.
+        private void OnDisable()
+        {
+            Current = default;
+        }
+
         private void Update()
         {
             Resolve();
@@ -213,7 +223,7 @@ namespace _Game.Code.Player
                 // Aim at the middle of the body. Aiming near the feet made the line
                 // graze the furniture the animal stands next to — a Kitty by the bed
                 // was unreachable because a blanket clipped the line.
-                if (Physics.Linecast(eye, PetAimPoint(pet), blockers, QueryTriggerInteraction.Ignore))
+                if (Physics.Linecast(eye, pet.AimPoint, blockers, QueryTriggerInteraction.Ignore))
                 {
                     continue;
                 }
@@ -223,19 +233,6 @@ namespace _Game.Code.Player
             }
 
             return best;
-        }
-
-        private static Vector3 PetAimPoint(Pet pet)
-        {
-            var controller = pet.GetComponent<CharacterController>();
-            if (controller == null)
-            {
-                return pet.transform.position;
-            }
-
-            // center is in the animal's local space, so it scales with the transform
-            // exactly like height and radius do (see MECHANICS.md section 2).
-            return pet.transform.TransformPoint(controller.center);
         }
     }
 }

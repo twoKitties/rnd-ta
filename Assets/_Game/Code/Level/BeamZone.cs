@@ -17,7 +17,7 @@ namespace _Game.Code.Level
     public class BeamZone : MonoBehaviour
     {
         [Header("MECHANICS.md section 2")]
-        [SerializeField] private float radius = 3f;
+        [SerializeField] private float radius = 1f;
 
         public float Radius => radius;
 

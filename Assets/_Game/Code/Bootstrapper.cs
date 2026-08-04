@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using _Game.Code.AI;
 using _Game.Code.Level;
 using _Game.Code.Noise;
+using _Game.Code.OldMan;
 using _Game.Code.Pets;
 using _Game.Code.Player;
 using _Game.Code.Spawning;
@@ -15,9 +16,10 @@ namespace _Game.Code
     /// here, and everything that has to happen before gameplay starts happens here —
     /// today that means placing the actors on their spawn points.
     ///
-    /// The pets and Old Man standing in the scene above the roof are scale
-    /// references, not gameplay: systems must take actors from this component, not
-    /// look them up by name or type.
+    /// Every actor in play is spawned from a prefab here, so systems must take them
+    /// from this component rather than looking them up by name or type
+    /// (MECHANICS.md 7.6) — an actor that does not exist until Awake cannot be
+    /// referenced by another prefab up front.
     /// </summary>
     public class Bootstrapper : MonoBehaviour
     {
@@ -28,6 +30,11 @@ namespace _Game.Code
 
         [Header("Scene")]
         [SerializeField] private Transform spawnsRoot;
+
+        [Tooltip("Old Man's round. Its direct children are the points, walked in " +
+                 "hierarchy order — reorder them in the Hierarchy to reroute him.")]
+        [SerializeField] private Transform patrolRoot;
+
         [SerializeField] private LevelGoal levelGoal;
 
         [Header("Spawning")]
@@ -58,6 +65,7 @@ namespace _Game.Code
         private readonly List<GameObject> _pets = new List<GameObject>();
         private readonly List<SensedPlayer> _sensedPlayers = new List<SensedPlayer>();
         private readonly List<NoiseEmitter> _noiseSources = new List<NoiseEmitter>();
+        private readonly List<Transform> _patrolPoints = new List<Transform>();
 
         private void Awake()
         {
@@ -83,15 +91,28 @@ namespace _Game.Code
             var oldMen = spawner.Spawn(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
             OldMan = oldMen.Count > 0 ? oldMen[0] : null;
 
+            // Before either bind: the goal now reads the players through the same
+            // SensedPlayer view the brains do, so the list has to exist first.
+            CollectActors(players);
+
             BindGoal(players);
-            BindBrains(players);
+            BindBrains();
         }
 
-        // Everything the AI needs to know about the rest of the level. Pushed in from
-        // here rather than looked up, for the same reason as BindGoal: an actor is a
-        // spawned prefab and cannot hold a reference to another spawned prefab.
-        private void BindBrains(IReadOnlyList<GameObject> players)
+        private void CollectActors(IReadOnlyList<GameObject> players)
         {
+            // Direct children, in hierarchy order: that order is the round, and the
+            // markers carry nothing but a Transform, so there is no component to look
+            // for. Any number of them is fine — the user adds yard points by dropping
+            // them under this root.
+            if (patrolRoot != null)
+            {
+                for (var i = 0; i < patrolRoot.childCount; i++)
+                {
+                    _patrolPoints.Add(patrolRoot.GetChild(i));
+                }
+            }
+
             for (var i = 0; i < players.Count; i++)
             {
                 if (players[i] == null)
@@ -112,9 +133,15 @@ namespace _Game.Code
 
                 CollectNoiseSource(_pets[i]);
             }
+        }
 
-            // A second pass over the animals, after every source is in the list: a Dog
-            // must be able to hear a Parrot that was created after it.
+        // Everything the AI needs to know about the rest of the level. Pushed in from
+        // here rather than looked up, for the same reason as BindGoal: an actor is a
+        // spawned prefab and cannot hold a reference to another spawned prefab.
+        private void BindBrains()
+        {
+            // Every noise source is already in the list by now, which is what lets a
+            // Dog hear a Parrot that was created after it.
             for (var i = 0; i < _pets.Count; i++)
             {
                 if (_pets[i] == null)
@@ -127,6 +154,17 @@ namespace _Game.Code
                 {
                     brain.Bind(_sensedPlayers, _noiseSources);
                 }
+            }
+
+            if (OldMan == null)
+            {
+                return;
+            }
+
+            var oldManBrain = OldMan.GetComponent<OldManBrain>();
+            if (oldManBrain != null)
+            {
+                oldManBrain.Bind(_sensedPlayers, _patrolPoints, _noiseSources);
             }
         }
 
@@ -148,7 +186,25 @@ namespace _Game.Code
                 return;
             }
 
-            levelGoal.Bind(players, _pets);
+            levelGoal.Bind(_sensedPlayers, _pets);
+
+            // Every avatar, not just the local one: a carrier shot inside the beam
+            // still hands its animal over (MECHANICS.md 3.7), and PlayerLife needs the
+            // goal to know that. The two below are HUD and input, so they are the
+            // local avatar's alone.
+            for (var i = 0; i < players.Count; i++)
+            {
+                if (players[i] == null)
+                {
+                    continue;
+                }
+
+                var life = players[i].GetComponent<PlayerLife>();
+                if (life != null)
+                {
+                    life.Bind(levelGoal);
+                }
+            }
 
             if (Player == null)
             {

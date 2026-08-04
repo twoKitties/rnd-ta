@@ -40,28 +40,50 @@ namespace _Game.Code.AI
             var corners = path.corners;
             for (var i = 1; i < corners.Length; i++)
             {
-                var from = corners[i - 1] + Vector3.up * probeHeight;
-                var to = corners[i] + Vector3.up * probeHeight;
-                var travel = to - from;
-                var distance = travel.magnitude;
-                if (distance < 0.0001f)
+                var door = FirstClosedDoorBetween(corners[i - 1] + Vector3.up * probeHeight,
+                    corners[i] + Vector3.up * probeHeight, doorMask, buffer);
+                if (door != null)
                 {
-                    continue;
+                    return door;
                 }
+            }
 
-                // Every hit on the segment, not just the first: a path can pass an open
-                // leaf standing in the room and then meet a shut one further along, and
-                // a single Linecast would stop at the open one and report the way clear.
-                var count = Physics.RaycastNonAlloc(from, travel / distance, buffer, distance, doorMask,
-                    QueryTriggerInteraction.Ignore);
+            return null;
+        }
 
-                for (var h = 0; h < count; h++)
+        /// <summary>
+        /// The same question about one straight segment, both ends given in world
+        /// space and already lifted to the probe height. Split out for the animals'
+        /// per-frame check on the leg they are currently walking, which has a corner
+        /// to aim at but no NavMeshPath to hand.
+        /// </summary>
+        public static Door FirstClosedDoorBetween(Vector3 from, Vector3 to, LayerMask doorMask,
+            RaycastHit[] buffer)
+        {
+            if (buffer == null)
+            {
+                return null;
+            }
+
+            var travel = to - from;
+            var distance = travel.magnitude;
+            if (distance < 0.0001f)
+            {
+                return null;
+            }
+
+            // Every hit on the segment, not just the first: a path can pass an open
+            // leaf standing in the room and then meet a shut one further along, and
+            // a single Linecast would stop at the open one and report the way clear.
+            var count = Physics.RaycastNonAlloc(from, travel / distance, buffer, distance, doorMask,
+                QueryTriggerInteraction.Ignore);
+
+            for (var h = 0; h < count; h++)
+            {
+                var door = buffer[h].collider.GetComponentInParent<Door>();
+                if (door != null && !door.IsOpen)
                 {
-                    var door = buffer[h].collider.GetComponentInParent<Door>();
-                    if (door != null && !door.IsOpen)
-                    {
-                        return door;
-                    }
+                    return door;
                 }
             }
 

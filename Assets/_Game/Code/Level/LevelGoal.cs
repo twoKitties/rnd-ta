@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using _Game.Code.AI;
 using _Game.Code.Pets;
 using _Game.Code.Player;
 using UnityEngine;
@@ -21,9 +22,13 @@ namespace _Game.Code.Level
         public bool IsWon { get; private set; }
         public bool IsLost { get; private set; }
 
-        private readonly List<GameObject> _players = new List<GameObject>();
+        // The same view of a player the brains get. It already answers the only two
+        // questions the outcome asks — where are they, and are they still alive — and
+        // it caches the PlayerLife lookup, which matters because this runs every
+        // frame (MECHANICS.md 7.6).
+        private readonly List<SensedPlayer> _players = new List<SensedPlayer>();
 
-        public void Bind(IReadOnlyList<GameObject> players, IReadOnlyList<GameObject> pets)
+        public void Bind(IReadOnlyList<SensedPlayer> players, IReadOnlyList<GameObject> pets)
         {
             _players.Clear();
             foreach (var player in players)
@@ -39,10 +44,22 @@ namespace _Game.Code.Level
         }
 
         /// <summary>
-        /// The one place an animal is put down. Whether it counts is decided by where
-        /// the carrier stood, not by where the animal ended up — MECHANICS.md 4.5.
-        /// An animal that merely runs through the beam hands itself over to nobody.
+        /// The rule, on its own: would letting go right now hand the animal over.
+        /// Whether it counts is decided by where the carrier stands, not by where the
+        /// animal ends up (MECHANICS.md 4.5) — an animal that merely runs through the
+        /// beam hands itself over to nobody.
+        ///
+        /// Pure, and split out for the same reason Pet.CanBeTakenBy is: under 7.4 the
+        /// host has to be able to re-run this over a request that arrived over the
+        /// wire, without the asking client's answer applying anything.
         /// </summary>
+        public bool CountsAsDelivery(PlayerHands hands)
+        {
+            return hands != null && !hands.IsEmpty && beamZone != null &&
+                   beamZone.Contains(hands.transform.position);
+        }
+
+        /// <summary>The one place an animal is put down.</summary>
         public void ReleaseCarried(PlayerHands hands)
         {
             if (hands == null || hands.IsEmpty)
@@ -50,16 +67,23 @@ namespace _Game.Code.Level
                 return;
             }
 
+            // Asked before the animal leaves the hands, since the rule is about the
+            // carrier and Release empties them.
+            var handedOver = CountsAsDelivery(hands);
             var pet = hands.Carried;
-            var handedOver = beamZone != null && beamZone.Contains(hands.transform.position);
 
             pet.Release();
 
-            if (!handedOver)
+            if (handedOver)
             {
-                return;
+                ApplyDelivery(pet);
             }
+        }
 
+        // The state change itself, the way Pet.ApplyCarry is: this is the line a
+        // netcode pass drives from replicated state so every peer counts the same.
+        private void ApplyDelivery(Pet pet)
+        {
             pet.Deliver();
             Delivered++;
             Debug.Log($"Beam: {pet.name} handed over ({Delivered}/{Total}).");
@@ -72,22 +96,32 @@ namespace _Game.Code.Level
                 return;
             }
 
+            // Nobody bound yet — an unopened scene, a missing reference on Bootstrapper,
+            // and tomorrow a client whose player list fills in after the first frame.
+            // Without this the count below reads "no living players" and latches the
+            // loss on frame one, permanently: an empty set has no outcome to judge.
+            if (_players.Count == 0)
+            {
+                return;
+            }
+
             // The order is not cosmetic (MECHANICS.md section 6): "everyone left is
             // inside the beam" is true of an empty set, so the death of the last
             // player after the last animal would otherwise be a win and a loss at
-            // once. There is no death in the game yet, so the living list is still
-            // everyone — block 5 fills this in.
+            // once. Liveness is PlayerLife's answer, not activeInHierarchy's: a shot
+            // player stays in the scene as a spectator camera (3.7), so the avatar is
+            // still active and would otherwise be counted among the living for ever.
             var living = 0;
             var livingInsideBeam = 0;
             foreach (var player in _players)
             {
-                if (player == null || !player.activeInHierarchy)
+                if (!player.IsAlive)
                 {
                     continue;
                 }
 
                 living++;
-                if (beamZone != null && beamZone.Contains(player.transform.position))
+                if (beamZone != null && beamZone.Contains(player.Transform.position))
                 {
                     livingInsideBeam++;
                 }

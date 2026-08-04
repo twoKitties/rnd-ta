@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FishNet;
+using FishNet.Object;
 using _Game.Code.AI;
 using _Game.Code.Level;
 using _Game.Code.Noise;
@@ -324,6 +325,15 @@ namespace _Game.Code
                 var point = points[drawn[i]];
                 var instance = Instantiate(prefab, point.position, point.rotation);
                 instance.name = prefab.name;
+
+                // Owned by nobody: the animals and Old Man belong to the rules, not to
+                // a player. Spawning is still the server's, so every peer gets the same
+                // three animals rather than three of its own.
+                if (IsNetworked && instance.GetComponent<NetworkObject>() != null)
+                {
+                    InstanceFinder.ServerManager.Spawn(instance);
+                }
+
                 spawned.Add(instance);
             }
 

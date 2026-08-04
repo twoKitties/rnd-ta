@@ -10,8 +10,9 @@ namespace _Game.Code.Player
     /// themselves, and whatever they are carrying, when looking down.
     /// <para>
     /// Applied only to the avatar the local player looks through: everyone else must
-    /// see a whole character. That is why <see cref="PlayerController"/> calls it
-    /// rather than this component applying itself on Awake.
+    /// see a whole character. That is why <see cref="LocalAvatar"/> calls it rather
+    /// than this component applying itself on Awake — it is one of the things that
+    /// belong to whoever owns the avatar, not to the avatar.
     /// </para>
     /// </summary>
     public class FirstPersonBody : MonoBehaviour

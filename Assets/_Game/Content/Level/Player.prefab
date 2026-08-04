@@ -782,6 +782,7 @@ GameObject:
   - component: {fileID: 5260468799113887754}
   - component: {fileID: 5878062049126280672}
   - component: {fileID: 4579252125903846854}
+  - component: {fileID: 2282483375681802043}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -874,7 +875,6 @@ MonoBehaviour:
   sprintSpeed: 4
   hands: {fileID: 5935024523324181470}
   cameraRoot: {fileID: 8386403753130933884}
-  body: {fileID: 453437188438686483}
   lookSensitivity: 0.12
   pitchLimit: 85
   gravity: -9.81
@@ -1025,6 +1025,27 @@ MonoBehaviour:
   disableOnDeath:
   - {fileID: 8720415816767902971}
   - {fileID: 3828167182167701776}
+--- !u!114 &2282483375681802043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91eceff23a12dd54384f452265f86738, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.LocalAvatar
+  localOnly:
+  - {fileID: 8110242453187437265}
+  - {fileID: 8605386320005633292}
+  - {fileID: 2739249694122642905}
+  - {fileID: 8720415816767902971}
+  - {fileID: 3828167182167701776}
+  - {fileID: 5466929205855753393}
+  - {fileID: 3317138996795760983}
+  body: {fileID: 453437188438686483}
 --- !u!1 &2255835499259793941
 GameObject:
   m_ObjectHideFlags: 0

@@ -104,7 +104,7 @@ namespace _Game.Code.Player
         {
             Resolve();
 
-            if (!_controller.InteractPressedThisFrame)
+            if (!_controller.Intent.Interact)
             {
                 return;
             }

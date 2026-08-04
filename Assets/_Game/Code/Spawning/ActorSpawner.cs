@@ -1,16 +1,14 @@
-using System.Collections.Generic;
-using UnityEngine;
-
 namespace _Game.Code.Spawning
 {
     /// <summary>
-    /// Places prefabs on spawn points, one point per prefab, points drawn at random
-    /// without repeats. A plain class, not a MonoBehaviour: it holds no scene
-    /// references, and Bootstrapper — the scene's entry point — owns it.
+    /// Draws which spawn point each actor gets — points without repeats, one per
+    /// actor. A plain class, not a MonoBehaviour: it holds no scene references, and
+    /// the level's entry point owns it.
     ///
-    /// Under MECHANICS.md 7.4 spawning is shared state, so once netcode lands only
-    /// the host runs this and replicates the result. The shape of the code does not
-    /// change: one owner, one instance, one call.
+    /// Under MECHANICS.md 7.4 and 7.7 the layout is shared state: it is drawn once, by
+    /// one side, and the result is what travels. That is why this draws indices and
+    /// creates nothing — instantiating is the state change, and it belongs to whoever
+    /// applies the layout, not to whoever chose it.
     /// </summary>
     public class ActorSpawner
     {
@@ -20,59 +18,54 @@ namespace _Game.Code.Spawning
         /// repeats the same one, which is what makes a spawn bug reproducible.</param>
         public ActorSpawner(int seed)
         {
-            // System.Random, not UnityEngine.Random: the latter is one global
-            // sequence for the whole process, and MECHANICS.md 7.3 keeps state off
-            // statics. Tomorrow this instance lives on the host.
-            _random = seed == 0 ? new System.Random() : new System.Random(seed);
+            // A zero seed is resolved to a real number here rather than left to
+            // new System.Random()'s own clock, so that the layout a host drew can be
+            // named, logged and sent — an unseeded sequence cannot be repeated by
+            // anybody, including us.
+            Seed = seed == 0 ? new System.Random().Next(1, int.MaxValue) : seed;
+
+            // System.Random, not UnityEngine.Random: the latter is one global sequence
+            // for the whole process, and MECHANICS.md 7.3 keeps state off statics.
+            _random = new System.Random(Seed);
         }
 
-        /// <summary>
-        /// Instantiates every prefab on a point of its own. Returns what was spawned,
-        /// in the order the prefabs came in.
-        /// </summary>
-        public List<GameObject> Spawn(IReadOnlyList<GameObject> prefabs, IReadOnlyList<Transform> points)
-        {
-            var spawned = new List<GameObject>();
-            if (prefabs == null || prefabs.Count == 0)
-            {
-                return spawned;
-            }
+        /// <summary>The seed actually in use, never zero. This is the layout's name.</summary>
+        public int Seed { get; }
 
-            if (points == null || points.Count < prefabs.Count)
+        /// <summary>
+        /// Which point each actor stands on: entry <c>i</c> is the point index for
+        /// actor <c>i</c>. Shorter than <paramref name="actorCount"/> when there are
+        /// not enough points — the caller decides how loudly to complain, because only
+        /// it knows what was left unplaced.
+        ///
+        /// Pure and side-effect free on purpose (MECHANICS.md 7.4): the same seed gives
+        /// the same array on any machine, so a host can re-run it over a request, or
+        /// send the array instead.
+        /// </summary>
+        public int[] Draw(int actorCount, int pointCount)
+        {
+            if (actorCount <= 0 || pointCount <= 0)
             {
-                // Loud on purpose: an actor that silently never reaches the level
-                // reads as a broken AI later and costs far more to find than this.
-                Debug.LogError($"ActorSpawner: {prefabs.Count} prefab(s) to place but only " +
-                               $"{(points == null ? 0 : points.Count)} spawn point(s). Some actors will be missing.");
+                return new int[0];
             }
 
             // Fisher-Yates over the point indices, stopped once enough are drawn.
-            var order = new int[points == null ? 0 : points.Count];
+            var order = new int[pointCount];
             for (var i = 0; i < order.Length; i++)
             {
                 order[i] = i;
             }
 
-            var take = Mathf.Min(prefabs.Count, order.Length);
+            var take = actorCount < pointCount ? actorCount : pointCount;
+            var drawn = new int[take];
             for (var i = 0; i < take; i++)
             {
                 var j = _random.Next(i, order.Length);
                 (order[i], order[j]) = (order[j], order[i]);
-
-                var prefab = prefabs[i];
-                if (prefab == null)
-                {
-                    Debug.LogError($"ActorSpawner: prefab at index {i} is not assigned, skipped.");
-                    continue;
-                }
-
-                var point = points[order[i]];
-                var instance = Object.Instantiate(prefab, point.position, point.rotation);
-                instance.name = prefab.name;
-                spawned.Add(instance);
+                drawn[i] = order[i];
             }
 
-            return spawned;
+            return drawn;
         }
     }
 }

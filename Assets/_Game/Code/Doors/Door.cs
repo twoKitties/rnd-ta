@@ -56,11 +56,23 @@ namespace _Game.Code.Doors
                 noise.Emit(useNoise);
             }
 
-            if (IsOpen)
+            ApplySwing(SwingFor(actor));
+        }
+
+        /// <summary>
+        /// The rule, on its own: where this leaf would end up if
+        /// <paramref name="actor"/> used it right now. Zero means shut.
+        ///
+        /// Pure and side-effect free (MECHANICS.md 7.4), because the side depends on
+        /// where the actor stands and only one machine may decide that — an actor
+        /// standing in the plane of the leaf gives opposite signs on two machines, and
+        /// the door would swing two different ways.
+        /// </summary>
+        public float SwingFor(Transform actor)
+        {
+            if (IsOpen || actor == null)
             {
-                _targetAngle = 0f;
-                IsOpen = false;
-                return;
+                return 0f;
             }
 
             // The leaf is shut here, so its own space is the closed frame, and local
@@ -71,8 +83,18 @@ namespace _Game.Code.Doors
             // a special case: their negative scale flips geometry and test together.
             var side = transform.InverseTransformPoint(actor.position).z;
 
-            _targetAngle = side >= 0f ? openAngle : -openAngle;
-            IsOpen = true;
+            return side >= 0f ? openAngle : -openAngle;
+        }
+
+        /// <summary>
+        /// The state change: the only thing that writes <see cref="IsOpen"/>, and the
+        /// only thing a netcode pass has to carry — one float. Every peer runs it, so
+        /// a leaf opened by one player is open for the pets' pathing on every machine.
+        /// </summary>
+        public void ApplySwing(float targetAngle)
+        {
+            _targetAngle = targetAngle;
+            IsOpen = !Mathf.Approximately(targetAngle, 0f);
         }
 
         // Update, not FixedUpdate: the leaf is a plain collider with no Rigidbody, so

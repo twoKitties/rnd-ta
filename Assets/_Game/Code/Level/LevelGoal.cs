@@ -26,19 +26,15 @@ namespace _Game.Code.Level
         // questions the outcome asks — where are they, and are they still alive — and
         // it caches the PlayerLife lookup, which matters because this runs every
         // frame (MECHANICS.md 7.6).
-        private readonly List<SensedPlayer> _players = new List<SensedPlayer>();
+        //
+        // The live list, not a copy of it — the same reference both brains hold. The
+        // roster is not fixed any more: a player who joins after this was bound has to
+        // exist for the outcome, and one who left has to stop existing for it.
+        private IReadOnlyList<SensedPlayer> _players;
 
         public void Bind(IReadOnlyList<SensedPlayer> players, IReadOnlyList<GameObject> pets)
         {
-            _players.Clear();
-            foreach (var player in players)
-            {
-                if (player != null)
-                {
-                    _players.Add(player);
-                }
-            }
-
+            _players = players;
             Total = pets == null ? 0 : pets.Count;
             Delivered = 0;
         }
@@ -59,12 +55,17 @@ namespace _Game.Code.Level
                    beamZone.Contains(hands.transform.position);
         }
 
-        /// <summary>The one place an animal is put down.</summary>
-        public void ReleaseCarried(PlayerHands hands)
+        /// <summary>
+        /// The one place an animal is put down. Answers whether letting go counted as
+        /// handing the animal over, so that the caller — a dying carrier, a player
+        /// pressing the button, tomorrow the host answering a request — does not have
+        /// to ask the rule a second time.
+        /// </summary>
+        public bool ReleaseCarried(PlayerHands hands)
         {
             if (hands == null || hands.IsEmpty)
             {
-                return;
+                return false;
             }
 
             // Asked before the animal leaves the hands, since the rule is about the
@@ -74,35 +75,47 @@ namespace _Game.Code.Level
 
             pet.Release();
 
-            if (handedOver)
+            if (!handedOver)
             {
-                ApplyDelivery(pet);
+                return false;
             }
+
+            ApplyDelivery(pet);
+
+            // Deliberately outside ApplyDelivery. That method is the state change every
+            // peer will run — the animal disappears into the saucer on all four
+            // screens. This line is bookkeeping owned by whoever decides, and running
+            // it everywhere would count the same animal up to four times.
+            Delivered++;
+            Debug.Log($"Beam: {pet.name} handed over ({Delivered}/{Total}).");
+            return true;
         }
 
         // The state change itself, the way Pet.ApplyCarry is: this is the line a
-        // netcode pass drives from replicated state so every peer counts the same.
+        // netcode pass drives from replicated state so every peer sees the same thing.
         private void ApplyDelivery(Pet pet)
         {
             pet.Deliver();
-            Delivered++;
-            Debug.Log($"Beam: {pet.name} handed over ({Delivered}/{Total}).");
         }
 
-        private void Update()
+        /// <summary>
+        /// The rule, on its own: has the raid ended, and how. Pure — it reads the
+        /// roster and the beam and writes nothing, so the authority can re-run it at
+        /// any moment and a peer can be handed the answer instead of computing one
+        /// (MECHANICS.md 7.4).
+        /// </summary>
+        public bool EvaluateOutcome(out bool won, out bool lost)
         {
-            if (IsWon || IsLost)
-            {
-                return;
-            }
+            won = false;
+            lost = false;
 
             // Nobody bound yet — an unopened scene, a missing reference on Bootstrapper,
             // and tomorrow a client whose player list fills in after the first frame.
             // Without this the count below reads "no living players" and latches the
             // loss on frame one, permanently: an empty set has no outcome to judge.
-            if (_players.Count == 0)
+            if (_players == null || _players.Count == 0)
             {
-                return;
+                return false;
             }
 
             // The order is not cosmetic (MECHANICS.md section 6): "everyone left is
@@ -129,15 +142,51 @@ namespace _Game.Code.Level
 
             if (living == 0)
             {
-                IsLost = true;
-                Debug.Log("Raid lost: every player is dead.");
+                lost = true;
+                return true;
+            }
+
+            won = Total > 0 && Delivered >= Total && livingInsideBeam == living;
+            return won;
+        }
+
+        /// <summary>
+        /// Latch the outcome. The state change, the way ApplyDelivery is: every peer
+        /// runs this, but only the authority decides what to pass in.
+        /// </summary>
+        public void ApplyOutcome(bool won, bool lost)
+        {
+            if (IsWon || IsLost)
+            {
                 return;
             }
 
-            if (Total > 0 && Delivered >= Total && livingInsideBeam == living)
+            IsWon = won;
+            IsLost = lost;
+
+            if (lost)
             {
-                IsWon = true;
+                Debug.Log("Raid lost: every player is dead.");
+            }
+            else if (won)
+            {
                 Debug.Log($"Raid won: {Delivered}/{Total} animals aboard and every player is in the beam.");
+            }
+        }
+
+        private void Update()
+        {
+            if (IsWon || IsLost)
+            {
+                return;
+            }
+
+            // Today the same machine asks and answers. Tomorrow only the host reaches
+            // the first line, and the second arrives from it — the shape does not
+            // change (MECHANICS.md 7.4).
+            if (EvaluateOutcome(out var won, out var lost))
+            {
+                ApplyOutcome(won, lost);
             }
         }
     }

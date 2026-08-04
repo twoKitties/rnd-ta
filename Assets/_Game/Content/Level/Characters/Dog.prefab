@@ -275,6 +275,7 @@ MonoBehaviour:
   sightCone: 120
   panicRadius: 6
   hearingThreshold: 30
+  chargeCone: 60
   fleeSpeed: 3.2
   approachSpeed: 1.6
   calmTime: 3
@@ -282,9 +283,12 @@ MonoBehaviour:
   distrustTime: 30
   alwaysAfraid: 0
   noiseReaction: 0
+  sightReaction: 1
+  noiseApproachFactor: 1.2
   corneredDistance: 1.5
   fleeFanCount: 7
   fleeFanSpread: 25
+  fleeHopSteps: 3
   repathInterval: 0.5
   navSampleRadius: 1
   pathProbeHeight: 0.5

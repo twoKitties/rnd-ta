@@ -50,7 +50,7 @@ namespace _Game.Code.UI
 
         private void InitializePanels()
         {
-            _panels.Add(Panel.Lobby, _mainMenuPanel);
+            _panels.Add(Panel.Lobby, _lobbyPanel);
             _panels.Add(Panel.Settings, _settingsPanel);
             _panels.Add(Panel.Main, _mainMenuPanel);
         }

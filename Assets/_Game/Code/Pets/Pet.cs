@@ -78,6 +78,21 @@ namespace _Game.Code.Pets
         private NavMeshAgent _agent;
         private CapsuleCollider _capsule;
 
+        // Presentation of being carried lives here rather than in PetBrain, because
+        // the brain is the animal's decision-making and will run on one machine only,
+        // while being carried has to look and sound the same on all of them.
+        private Animator _animator;
+        private PetVoice _voice;
+
+        /// <summary>
+        /// The two floats of the vendor controller: whether the legs move, and how
+        /// fast. Owned here, next to the code that stops them, and read by PetBrain
+        /// while the animal is on the ground.
+        /// </summary>
+        internal static readonly int VertParameter = Animator.StringToHash("Vert");
+
+        internal static readonly int StateParameter = Animator.StringToHash("State");
+
         // How far a failed Warp may look for legal ground, world metres. Not a
         // tunable: it is a rescue for a case that should not happen, and a wider
         // search would teleport the animal somewhere the player did not put it.
@@ -101,6 +116,8 @@ namespace _Game.Code.Pets
         {
             _agent = GetComponent<NavMeshAgent>();
             _capsule = GetComponent<CapsuleCollider>();
+            _animator = GetComponent<Animator>();
+            _voice = GetComponent<PetVoice>();
         }
 
         /// <summary>
@@ -184,6 +201,14 @@ namespace _Game.Code.Pets
 
             transform.position = ClampedCarryPosition(anchor);
             transform.rotation = Quaternion.Euler(0f, anchor.eulerAngles.y, 0f);
+
+            // Here rather than in PetBrain: a Dog whines all the way to the saucer, and
+            // that is a mechanic (MECHANICS.md 4.4), not decoration — every machine has
+            // to hear it, including the ones not running the brain.
+            if (_voice != null)
+            {
+                _voice.WhileCarried();
+            }
         }
 
         /// <summary>
@@ -224,13 +249,38 @@ namespace _Game.Code.Pets
             return anchor.position;
         }
 
-        // The state change itself. This is the line a netcode pass will drive from
-        // replicated state so that every peer shows the same thing.
-        private void ApplyCarry(PlayerHands hands)
+        /// <summary>
+        /// The state change itself. This is the line a netcode pass will drive from
+        /// replicated state so that every peer shows the same thing — which is why it
+        /// is callable from outside: the machine that decided is not always the
+        /// machine that applies.
+        /// </summary>
+        public void ApplyCarry(PlayerHands hands)
         {
+            if (hands == null || _isCarried)
+            {
+                return;
+            }
+
             Carrier = hands;
             _isCarried = true;
             hands.Take(this);
+
+            // The legs are stopped once, here, and not every frame: nothing drives the
+            // animator while the animal is carried, so the two floats keep whatever the
+            // last frame on the ground left in them. An animal grabbed at a run went on
+            // running in mid-air over its carrier's head the whole way to the saucer,
+            // which in first person is right in view.
+            if (_animator != null)
+            {
+                _animator.SetFloat(VertParameter, 0f);
+                _animator.SetFloat(StateParameter, 0f);
+            }
+
+            if (_voice != null)
+            {
+                _voice.Caught();
+            }
 
             // The agent and the carry both want to drive the transform; leaving it on
             // makes the animal jitter or refuse to move at all.
@@ -248,7 +298,11 @@ namespace _Game.Code.Pets
             }
         }
 
-        private void ApplyRelease(Vector3 position)
+        /// <summary>
+        /// The other half of the same pair, public for the same reason: the peer that
+        /// applies a release is not necessarily the one that decided it.
+        /// </summary>
+        public void ApplyRelease(Vector3 position)
         {
             var carrier = Carrier;
             Carrier = null;

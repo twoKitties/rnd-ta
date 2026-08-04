@@ -67,6 +67,8 @@ namespace _Game.Code
         private readonly List<NoiseEmitter> _noiseSources = new List<NoiseEmitter>();
         private readonly List<Transform> _patrolPoints = new List<Transform>();
 
+        private ActorSpawner _spawner;
+
         private void Awake()
         {
             if (spawnsRoot == null)
@@ -80,26 +82,161 @@ namespace _Game.Code
             // One spawner for the whole scene, so a fixed seed produces one
             // reproducible layout across all three groups rather than three
             // independent ones. Today this runs locally; under MECHANICS.md 7.4 the
-            // host is the only one that will run it once netcode lands.
-            var spawner = new ActorSpawner(seed);
+            // host is the only one that will run it once netcode lands, and it is the
+            // resolved Seed — never zero — that it would send.
+            _spawner = new ActorSpawner(seed);
 
-            var players = spawner.Spawn(new[] { playerPrefab }, PointsOf(points, SpawnKind.Player));
-            Player = players.Count > 0 ? players[0] : null;
+            var avatars = Place(new[] { playerPrefab }, PointsOf(points, SpawnKind.Player));
 
-            _pets.AddRange(spawner.Spawn(petPrefabs, PointsOf(points, SpawnKind.Pet)));
+            _pets.AddRange(Place(petPrefabs, PointsOf(points, SpawnKind.Pet)));
 
-            var oldMen = spawner.Spawn(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
+            var oldMen = Place(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
             OldMan = oldMen.Count > 0 ? oldMen[0] : null;
 
-            // Before either bind: the goal now reads the players through the same
-            // SensedPlayer view the brains do, so the list has to exist first.
-            CollectActors(players);
+            CollectActors();
 
-            BindGoal(players);
+            // Before the players are added: the goal holds the live player list rather
+            // than a copy of it, so it must be bound once and then simply sees whoever
+            // joins later.
+            if (levelGoal != null)
+            {
+                levelGoal.Bind(_sensedPlayers, _pets);
+            }
+
+            // Exactly one avatar exists today and it is ours. Tomorrow this loop runs
+            // once per connection and only one of them passes true.
+            for (var i = 0; i < avatars.Count; i++)
+            {
+                AddPlayer(avatars[i], i == 0);
+            }
+
             BindBrains();
         }
 
-        private void CollectActors(IReadOnlyList<GameObject> players)
+        /// <summary>
+        /// Take an avatar into the level: the AI starts sensing it, its noise starts
+        /// being heard, and the outcome starts counting it. <paramref name="isLocal"/>
+        /// says whether this is the avatar the person at this screen looks through —
+        /// camera, ear, HUD and input belong to that one alone.
+        ///
+        /// Public because the roster is not fixed at Awake any more: a player can
+        /// arrive after the level has started, and both brains hold the live list, so
+        /// appending here is all it takes for them to see the newcomer.
+        /// </summary>
+        public void AddPlayer(GameObject avatar, bool isLocal)
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (avatar == null)
+            {
+                return;
+            }
+
+            _sensedPlayers.Add(new SensedPlayer(avatar));
+            CollectNoiseSource(avatar);
+
+            // Every avatar, not just the local one: a carrier shot inside the beam
+            // still hands its animal over (MECHANICS.md 3.7), and PlayerLife needs the
+            // goal to know that.
+            var life = avatar.GetComponent<PlayerLife>();
+            if (life != null && levelGoal != null)
+            {
+                life.Bind(levelGoal);
+            }
+
+            var local = avatar.GetComponent<LocalAvatar>();
+            if (local != null)
+            {
+                local.Apply(isLocal);
+            }
+
+            if (!isLocal)
+            {
+                return;
+            }
+
+            Player = avatar;
+            BindLocal(avatar);
+        }
+
+        /// <summary>
+        /// Drop an avatar from the level — the player left. The animal they were
+        /// carrying goes through <see cref="PlayerLife.Kill"/> rather than being
+        /// dropped by the pet noticing a destroyed carrier, because leaving while
+        /// standing in the beam still hands it over (MECHANICS.md 3.7); Kill is
+        /// idempotent, so calling it on somebody already shot changes nothing.
+        /// </summary>
+        public void RemovePlayer(GameObject avatar)
+        {
+            if (avatar == null)
+            {
+                return;
+            }
+
+            var life = avatar.GetComponent<PlayerLife>();
+            if (life != null)
+            {
+                life.Kill();
+            }
+
+            for (var i = _sensedPlayers.Count - 1; i >= 0; i--)
+            {
+                if (_sensedPlayers[i].Transform == avatar.transform)
+                {
+                    _sensedPlayers.RemoveAt(i);
+                }
+            }
+
+            var emitter = avatar.GetComponent<NoiseEmitter>();
+            if (emitter != null)
+            {
+                _noiseSources.Remove(emitter);
+            }
+
+            if (Player == avatar)
+            {
+                Player = null;
+            }
+        }
+
+        // Applies a drawn layout: the indices are the decision, this is the state
+        // change (MECHANICS.md 7.4). Kept here rather than in ActorSpawner so that the
+        // host can one day send the indices and every peer run this half unchanged.
+        private List<GameObject> Place(IReadOnlyList<GameObject> prefabs, IReadOnlyList<Transform> points)
+        {
+            var spawned = new List<GameObject>();
+            if (prefabs == null || prefabs.Count == 0)
+            {
+                return spawned;
+            }
+
+            var drawn = _spawner.Draw(prefabs.Count, points == null ? 0 : points.Count);
+            if (drawn.Length < prefabs.Count)
+            {
+                // Loud on purpose: an actor that silently never reaches the level
+                // reads as a broken AI later and costs far more to find than this.
+                Debug.LogError($"Bootstrapper: {prefabs.Count} prefab(s) to place but only " +
+                               $"{(points == null ? 0 : points.Count)} spawn point(s). Some actors will be missing.");
+            }
+
+            for (var i = 0; i < drawn.Length; i++)
+            {
+                var prefab = prefabs[i];
+                if (prefab == null)
+                {
+                    Debug.LogError($"Bootstrapper: prefab at index {i} is not assigned, skipped.");
+                    continue;
+                }
+
+                var point = points[drawn[i]];
+                var instance = Instantiate(prefab, point.position, point.rotation);
+                instance.name = prefab.name;
+                spawned.Add(instance);
+            }
+
+            return spawned;
+        }
+
+        private void CollectActors()
         {
             // Direct children, in hierarchy order: that order is the round, and the
             // markers carry nothing but a Transform, so there is no component to look
@@ -111,17 +248,6 @@ namespace _Game.Code
                 {
                     _patrolPoints.Add(patrolRoot.GetChild(i));
                 }
-            }
-
-            for (var i = 0; i < players.Count; i++)
-            {
-                if (players[i] == null)
-                {
-                    continue;
-                }
-
-                _sensedPlayers.Add(new SensedPlayer(players[i]));
-                CollectNoiseSource(players[i]);
             }
 
             for (var i = 0; i < _pets.Count; i++)
@@ -136,7 +262,7 @@ namespace _Game.Code
         }
 
         // Everything the AI needs to know about the rest of the level. Pushed in from
-        // here rather than looked up, for the same reason as BindGoal: an actor is a
+        // here rather than looked up, for the same reason as BindLocal: an actor is a
         // spawned prefab and cannot hold a reference to another spawned prefab.
         private void BindBrains()
         {
@@ -178,46 +304,22 @@ namespace _Game.Code
         }
 
         // The goal and the beam are scene objects, so a spawned avatar cannot hold a
-        // reference to them up front — the entry point hands it over instead.
-        private void BindGoal(IReadOnlyList<GameObject> players)
+        // reference to them up front — the entry point hands it over instead. These
+        // two are interaction and HUD, so they are the local avatar's alone.
+        private void BindLocal(GameObject avatar)
         {
             if (levelGoal == null)
             {
                 return;
             }
 
-            levelGoal.Bind(_sensedPlayers, _pets);
-
-            // Every avatar, not just the local one: a carrier shot inside the beam
-            // still hands its animal over (MECHANICS.md 3.7), and PlayerLife needs the
-            // goal to know that. The two below are HUD and input, so they are the
-            // local avatar's alone.
-            for (var i = 0; i < players.Count; i++)
-            {
-                if (players[i] == null)
-                {
-                    continue;
-                }
-
-                var life = players[i].GetComponent<PlayerLife>();
-                if (life != null)
-                {
-                    life.Bind(levelGoal);
-                }
-            }
-
-            if (Player == null)
-            {
-                return;
-            }
-
-            var interactor = Player.GetComponent<PlayerInteractor>();
+            var interactor = avatar.GetComponent<PlayerInteractor>();
             if (interactor != null)
             {
                 interactor.Bind(levelGoal);
             }
 
-            var status = Player.GetComponentInChildren<LevelStatusUI>(true);
+            var status = avatar.GetComponentInChildren<LevelStatusUI>(true);
             if (status != null)
             {
                 status.Bind(levelGoal);

@@ -17,9 +17,38 @@ namespace _Game.Code.Player
     }
 
     /// <summary>
+    /// One frame of what an avatar is being asked to do (MECHANICS.md 7.1). The
+    /// simulation below consumes only this and never asks a device anything, so the
+    /// same frame can arrive from the network instead of from a keyboard without the
+    /// shape of the code changing.
+    ///
+    /// <see cref="Look"/> is the raw pointer delta, already a per-frame increment —
+    /// sensitivity is applied by the simulation, not by the reader, because it is a
+    /// tunable of this avatar rather than a property of the device.
+    /// </summary>
+    public struct PlayerIntent
+    {
+        public Vector2 Move;
+        public Vector2 Look;
+        public bool Sprint;
+        public bool Crouch;
+
+        /// <summary>Down on this frame, not held.</summary>
+        public bool Jump;
+
+        /// <summary>Down on this frame, not held.</summary>
+        public bool Interact;
+    }
+
+    /// <summary>
     /// First-person movement and look. Speeds come from the tunables table in
     /// MECHANICS.md section 2 — change them there first, one at a time.
     /// </summary>
+    // Runs before the rest of the avatar. Everything else on it — PlayerInteractor,
+    // PlayerNoise, PlayerAnimator — reads Intent, State and Speed, which are written
+    // here; without a fixed order they would read the previous frame's values, and
+    // Interact would fire a frame late.
+    [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
@@ -33,7 +62,6 @@ namespace _Game.Code.Player
 
         [Header("Look")]
         [SerializeField] private Transform cameraRoot;
-        [SerializeField] private FirstPersonBody body;
         [SerializeField] private float lookSensitivity = 0.12f;
         [SerializeField] private float pitchLimit = 85f;
 
@@ -54,11 +82,13 @@ namespace _Game.Code.Player
         public float Speed { get; private set; }
 
         /// <summary>
-        /// True on the frame Interact went down. This component owns the avatar's
-        /// input, so other systems read the intent from here instead of opening a
-        /// second InputSystem_Actions — see MECHANICS.md 7.1.
+        /// What this avatar is being asked to do this frame. Filled from the device by
+        /// <see cref="ReadInput"/> today; the setter is public because tomorrow the
+        /// host fills it for the avatars it does not own, from a frame that arrived
+        /// over the wire (MECHANICS.md 7.1). Everything downstream — movement, look,
+        /// noise, interaction — reads this and nothing else.
         /// </summary>
-        public bool InteractPressedThisFrame => _input.Player.Interact.WasPressedThisFrame();
+        public PlayerIntent Intent { get; set; }
 
         /// <summary>
         /// The Interact button's name for the HUD — "E" on a keyboard. Comes from the
@@ -80,27 +110,14 @@ namespace _Game.Code.Player
             _input = new InputSystem_Actions();
         }
 
-        private void Start()
-        {
-            // This component only ever drives the avatar the local player looks
-            // through, so reaching the first-person view from here is the ownership
-            // check. Once netcode lands, gate it on "is the local avatar" instead.
-            if (body != null)
-            {
-                body.ApplyFirstPersonView();
-            }
-        }
-
         private void OnEnable()
         {
             _input.Player.Enable();
-            Cursor.lockState = CursorLockMode.Locked;
         }
 
         private void OnDisable()
         {
             _input.Player.Disable();
-            Cursor.lockState = CursorLockMode.None;
 
             // Move stops running, so State and Speed would keep their last values for
             // good. Everything downstream reads them: a player shot mid-sprint would
@@ -110,6 +127,7 @@ namespace _Game.Code.Player
             // either.
             State = MoveState.Idle;
             Speed = 0f;
+            Intent = default;
         }
 
         private void OnDestroy()
@@ -119,8 +137,29 @@ namespace _Game.Code.Player
 
         private void Update()
         {
+            // The one place a device is read. Once an avatar can be driven from the
+            // network, this is the line that is skipped for the ones we do not own —
+            // Look and Move below stay exactly as they are.
+            Intent = ReadInput();
+
             Look();
             Move();
+        }
+
+        // Devices in, intent out, nothing else. Deliberately produces no side effects:
+        // the button states are sampled once per frame so that two readers of the same
+        // intent cannot disagree about whether Interact went down.
+        private PlayerIntent ReadInput()
+        {
+            return new PlayerIntent
+            {
+                Move = _input.Player.Move.ReadValue<Vector2>(),
+                Look = _input.Player.Look.ReadValue<Vector2>(),
+                Sprint = _input.Player.Sprint.IsPressed(),
+                Crouch = _input.Player.Crouch.IsPressed(),
+                Jump = _input.Player.Jump.WasPressedThisFrame(),
+                Interact = _input.Player.Interact.WasPressedThisFrame()
+            };
         }
 
         private void Look()
@@ -132,7 +171,7 @@ namespace _Game.Code.Player
                 return;
             }
 
-            var look = _input.Player.Look.ReadValue<Vector2>() * lookSensitivity;
+            var look = Intent.Look * lookSensitivity;
 
             // Pointer delta is already a per-frame increment. Multiplying it by
             // Time.deltaTime is the classic bug that ties sensitivity to frame rate.
@@ -144,7 +183,7 @@ namespace _Game.Code.Player
 
         private void Move()
         {
-            var input = _input.Player.Move.ReadValue<Vector2>();
+            var input = Intent.Move;
 
             State = ResolveState(input);
             Speed = State switch
@@ -177,7 +216,7 @@ namespace _Game.Code.Player
                     _verticalVelocity = groundedStick;
                 }
 
-                if (_input.Player.Jump.WasPressedThisFrame())
+                if (Intent.Jump)
                 {
                     // Launch speed that peaks at exactly jumpHeight: v = sqrt(2 * g * h).
                     // Deriving it from the height keeps the tunable in metres, so it stays
@@ -201,12 +240,12 @@ namespace _Game.Code.Player
 
             // Crouch wins over Sprint: it is the quiet state, and holding both must
             // not let a player be quiet and fast at the same time.
-            if (_input.Player.Crouch.IsPressed())
+            if (Intent.Crouch)
             {
                 return MoveState.Crouch;
             }
 
-            return _input.Player.Sprint.IsPressed() ? MoveState.Sprint : MoveState.Walk;
+            return Intent.Sprint ? MoveState.Sprint : MoveState.Walk;
         }
     }
 }

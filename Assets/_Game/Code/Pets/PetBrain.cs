@@ -19,6 +19,25 @@ namespace _Game.Code.Pets
         Flee
     }
 
+    /// <summary>
+    /// What an animal does about a player it can see and is not afraid of
+    /// (MECHANICS.md 4.1). Data on the prefab rather than a branch per species, the
+    /// same way <see cref="PetNoiseReaction"/> is, so the three still "differ by
+    /// numbers only".
+    /// </summary>
+    public enum PetSightReaction
+    {
+        /// <summary>Stands its ground and watches. The Kitty and the Parrot.</summary>
+        Alert,
+
+        /// <summary>
+        /// Comes at them barking and stops at the panic ring. The Dog — a watchdog,
+        /// which is why walking up to one costs a bark and therefore Old Man, while
+        /// sneaking up to it still costs nothing.
+        /// </summary>
+        Approach
+    }
+
     /// <summary>Which of its states an animal is in. Read by the animator and by tests.</summary>
     public enum PetState
     {
@@ -40,11 +59,14 @@ namespace _Game.Code.Pets
     ///
     /// 1. Being carried beats everything; the agent is off and this class waits.
     /// 2. Just dropped: 30 s of distrust of every player, and it bolts.
-    /// 3. Seen player inside the panic radius, and it is afraid of them → flee.
-    ///    Afraid means: it always is (the Parrot), or it distrusts, or the player is
-    ///    moving upright. A player who sneaks or stands still and is trusted may walk
-    ///    right up to it — that is the entire luring mechanic.
-    /// 4. Seen player further off → alert: it turns and watches.
+    /// 3. Seen player charging it, at any distance, or one inside the panic radius it
+    ///    is afraid of → flee. Afraid means: it always is (the Parrot), or it
+    ///    distrusts, or the player is moving upright — except for a watchdog, which an
+    ///    upright player draws rather than frightens. A player who sneaks or stands
+    ///    still and is trusted may walk right up to any of them — that is the entire
+    ///    luring mechanic.
+    /// 4. Seen player it does not fear → the species' sight reaction: watch them, or
+    ///    come at them barking and stop on the panic ring.
     /// 5. Heard something ≥ its threshold → the species' reaction. Sight always beats
     ///    noise (4.1, 4.3), which is why this is below both checks above.
     /// 6. Nothing for the calm-down time → idle.
@@ -102,6 +124,25 @@ namespace _Game.Code.Pets
 
         [SerializeField] private PetNoiseReaction noiseReaction = PetNoiseReaction.Approach;
 
+        [Tooltip("What it does about a player it sees and does not fear. Approach makes " +
+                 "it a watchdog: an upright player draws it instead of frightening it.")]
+        [SerializeField] private PetSightReaction sightReaction = PetSightReaction.Alert;
+
+        [Tooltip("How much further than the panic radius a noise-driven approach stops, " +
+                 "as a multiplier. 1 puts the animal exactly on the ring it panics at, " +
+                 "so it bolts on arrival and comes straight back — the back-and-forth " +
+                 "reported in Play mode on 2026-08-04.")]
+        [SerializeField] private float noiseApproachFactor = 1.2f;
+
+        [Tooltip("How close a watchdog comes to the player it is barking at, world m. " +
+                 "Deliberately not the panic radius: sight is only 2 m further out than " +
+                 "that ring, so stopping there was invisible — it read as standing still.")]
+        [SerializeField] private float watchStopDistance = 1.5f;
+
+        [Tooltip("How long it keeps looking at a spot after a flee ends, seconds. It has " +
+                 "to outlast the turn itself — one frame of RotateTowards is about 6°.")]
+        [SerializeField] private float alertLookTime = 2f;
+
         [Header("Fleeing (MECHANICS.md section 2)")]
         [Tooltip("Nowhere better than this to run to means it is cornered: it freezes and can be picked up.")]
         [SerializeField] private float corneredDistance = 1.5f;
@@ -131,12 +172,6 @@ namespace _Game.Code.Pets
         [Tooltip("Just the Door layer.")]
         [SerializeField] private LayerMask doorMask;
 
-        // Hashes, not state: nothing per-animal lives here (MECHANICS.md 7.3). The two
-        // floats are the whole interface of the pack's animator controllers — Vert is
-        // 0 idle / 1 moving, State is 0 walk / 1 run.
-        private static readonly int VertParameter = Animator.StringToHash("Vert");
-        private static readonly int StateParameter = Animator.StringToHash("State");
-
         private Pet _pet;
         private NavMeshAgent _agent;
         private Animator _animator;
@@ -155,6 +190,11 @@ namespace _Game.Code.Pets
         private float _repathAt;
         private bool _wasCarried;
         private Vector3 _noiseSpot;
+
+        // Where it is looking while alert. Kept apart from the noise spot: the two are
+        // set by different things and a flee ends by looking at a player, not at a
+        // sound.
+        private Vector3 _alertSpot;
 
         // Who it backed away from, kept so a cornered animal can go on turning to face
         // them between two repaths.
@@ -193,36 +233,13 @@ namespace _Game.Code.Pets
         private void Update()
         {
             // Carried: Pet has switched the agent off, and nothing here may fight it.
-            // The voice still runs — a Dog whines all the way to the saucer.
+            // Stopping the legs, the caught cry and the whimper all the way to the
+            // saucer live in Pet itself — every machine shows and hears them, while
+            // this brain will run on one (MECHANICS.md 7.4).
             if (_pet.Carrier != null)
             {
-                if (!_wasCarried)
-                {
-                    if (_voice != null)
-                    {
-                        _voice.Caught();
-                    }
-
-                    // The legs are stopped once, here, and not every frame: DriveAnimator
-                    // never runs while the animal is carried, so the two floats keep
-                    // whatever the last frame on the ground left in them. An animal
-                    // grabbed at a run went on running in mid-air over its carrier's head
-                    // the whole way to the saucer, which in first person is right in view.
-                    if (_animator != null)
-                    {
-                        _animator.SetFloat(VertParameter, 0f);
-                        _animator.SetFloat(StateParameter, 0f);
-                    }
-                }
-
                 _wasCarried = true;
                 State = PetState.Carried;
-
-                if (_voice != null)
-                {
-                    _voice.WhileCarried();
-                }
-
                 return;
             }
 
@@ -253,15 +270,20 @@ namespace _Game.Code.Pets
             // Someone running straight at it: it gives voice, in whatever state it is
             // in (4.4). PetVoice paces the repeats with its own cooldown, and an animal
             // with no clip in the slot stays completely silent.
-            if (threat != null && _voice != null && IsChargedBy(threat))
+            var charged = threat != null && IsChargedBy(threat);
+            if (charged && _voice != null)
             {
                 _voice.Noticed();
             }
 
             CheckDoorAhead();
 
-            var afraid = threat != null && IsAfraidOf(threat) &&
-                         HorizontalDistance(threat.Transform.position) <= panicRadius;
+            // Being charged bolts every animal at any distance inside its sight, and
+            // that is the one thing a watchdog runs from too (design call 2026-08-04).
+            // Everything else about fear is still the panic ring.
+            var afraid = charged ||
+                         (threat != null && IsAfraidOf(threat) &&
+                          HorizontalDistance(threat.Transform.position) <= panicRadius);
 
             if (afraid)
             {
@@ -284,7 +306,10 @@ namespace _Game.Code.Pets
                     _calmFor += Time.deltaTime;
                     if (_calmFor >= calmTime)
                     {
-                        EnterIdle();
+                        // It stops and turns back to look at whoever it ran from
+                        // rather than standing there facing the wall it fled towards.
+                        // All three species, so that the flee still ends in one place.
+                        CalmDown();
                     }
                     else
                     {
@@ -302,6 +327,14 @@ namespace _Game.Code.Pets
 
             if (State == PetState.Freeze)
             {
+                // It turns its head towards whatever it heard while it stands there.
+                // Freezing on its own is invisible — the animal was already standing
+                // still, so a sprint behind a Kitty read as "she ignores me" in Play
+                // mode on 2026-08-04. Only a sprint reaches the animals' threshold of
+                // 30 (crouch 8, step 25), so this costs the back approach nothing:
+                // walking or sneaking up behind one still never turns it round.
+                FaceTowards(_noiseSpot);
+
                 _stateTimer -= Time.deltaTime;
                 if (_stateTimer <= 0f)
                 {
@@ -311,14 +344,13 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            // Sight beats noise (4.1): an animal that can see the player watches them
-            // rather than walking towards the racket they are making. Out here, past
-            // the panic radius, that racket is usually the player's own sprint — the
-            // other order had the animal trot towards the very thing it was warning
-            // about, which is what this ring exists to warn about.
+            // Sight beats noise (4.1): what an animal can see settles the matter, and
+            // the racket out here past the panic radius is usually that same player's
+            // sprint. The species decides what "settled" means — watch, or come and
+            // bark.
             if (threat != null)
             {
-                EnterAlert(threat);
+                ReactToSight(threat);
                 return;
             }
 
@@ -329,10 +361,31 @@ namespace _Game.Code.Pets
                 return;
             }
 
+            // Still walking to where the sound was, or to where a watchdog last saw
+            // somebody, after the sound stopped and the player went out of sight. The
+            // wider ring, because from here on nothing is watching: arriving on the
+            // panic ring itself is what started the loop this factor exists to break.
             if (State == PetState.Approach)
             {
-                KeepApproaching();
+                if (KeepApproaching(panicRadius * noiseApproachFactor))
+                {
+                    EnterIdle();
+                }
+
                 return;
+            }
+
+            // Finishing a turn towards something it can no longer see — the look back
+            // at the end of a flee, most often. Held for alertLookTime, because the
+            // turn takes many frames and there is nothing else keeping the state.
+            if (State == PetState.Alert)
+            {
+                FaceTowards(_alertSpot);
+                _stateTimer -= Time.deltaTime;
+                if (_stateTimer > 0f)
+                {
+                    return;
+                }
             }
 
             EnterIdle();
@@ -396,8 +449,72 @@ namespace _Game.Code.Pets
         private bool IsAfraidOf(SensedPlayer player)
         {
             // The Parrot is afraid of everyone always; everybody else is afraid of a
-            // player they distrust, and of one moving upright rather than sneaking.
-            return alwaysAfraid || Distrusts || !player.IsQuiet;
+            // player they distrust.
+            if (alwaysAfraid || Distrusts)
+            {
+                return true;
+            }
+
+            // Moving upright is what frightens an animal that runs — and what draws
+            // one that guards. The Dog is not scared of somebody walking up to it; it
+            // comes to bark at them, and only a charge sends it running (4.1, design
+            // call 2026-08-04). Crouching and standing still are invisible to both
+            // reactions, which is what keeps the luring mechanic alive.
+            return sightReaction != PetSightReaction.Approach && !player.IsQuiet;
+        }
+
+        // What a seen, unfeared player provokes. One switch, so the difference between
+        // a watchdog and a skittish animal stays a serialized value.
+        private void ReactToSight(SensedPlayer player)
+        {
+            if (sightReaction != PetSightReaction.Approach)
+            {
+                EnterAlert(player);
+                return;
+            }
+
+            // Barking while it comes. The bark is noise like a step, so this is the
+            // price of walking rather than sneaking (4.4); PetVoice's own cooldown
+            // paces it, and an empty clip slot keeps it silent.
+            if (_voice != null)
+            {
+                _voice.Noticed();
+            }
+
+            var here = player.Transform.position;
+
+            // Already as close as it means to get: it stands its ground and barks. It
+            // must not be pushed back out to the ring — a watchdog that retreats as you
+            // walk in can never be reached, and walking up to it is exactly how it is
+            // meant to be caught (4.1). Backing off is also what made this read as
+            // "just stands there and looks".
+            if (HorizontalDistance(here) <= watchStopDistance)
+            {
+                EnterAlert(player);
+                return;
+            }
+
+            var offset = transform.position - here;
+            offset.y = 0f;
+            if (offset.sqrMagnitude < 0.0001f)
+            {
+                EnterAlert(player);
+                return;
+            }
+
+            State = PetState.Approach;
+
+            // A point watchStopDistance short of the player, on the line between them,
+            // rather than the player themselves: walking onto somebody is not a place
+            // an agent can stand.
+            _noiseSpot = here + offset.normalized * watchStopDistance;
+
+            // The ring is the stop distance here, not the panic radius: for a watchdog
+            // this is where it is going, not a place it fears.
+            if (KeepApproaching(watchStopDistance))
+            {
+                EnterAlert(player);
+            }
         }
 
         private void ReactToNoise(Vector3 where)
@@ -427,7 +544,17 @@ namespace _Game.Code.Pets
 
                 default:
                     State = PetState.Approach;
-                    KeepApproaching();
+
+                    // Short of the panic ring, not on it. Stopping exactly on the ring
+                    // put the animal one step from bolting, so it arrived, panicked,
+                    // ran, calmed down and came back — a visible loop, and the very
+                    // "pulled towards the player and pushed away by them" contradiction
+                    // the priority rule in 4.3 exists to prevent.
+                    if (KeepApproaching(panicRadius * noiseApproachFactor))
+                    {
+                        EnterIdle();
+                    }
+
                     break;
             }
         }
@@ -437,9 +564,16 @@ namespace _Game.Code.Pets
         /// (MECHANICS.md 4.3): the pull is reconnaissance — a way to draw an animal out
         /// of a room nobody can reach — and never a way to walk it into someone's arms.
         /// </summary>
-        private void KeepApproaching()
+        /// <summary>
+        /// Walks towards <see cref="_noiseSpot"/>, never coming closer to any player
+        /// than <paramref name="ring"/>. Answers whether it has got as far as it is
+        /// going to — either it arrived, or there is no path — and leaves what to do
+        /// about that to the caller, because a noise runs out into idle while a
+        /// watchdog's approach ends in standing and watching.
+        /// </summary>
+        private bool KeepApproaching(float ring)
         {
-            var target = ClampAwayFromPlayers(_noiseSpot);
+            var target = ClampAwayFromPlayers(_noiseSpot, ring);
 
             _agent.speed = approachSpeed;
             _agent.isStopped = false;
@@ -449,17 +583,14 @@ namespace _Game.Code.Pets
                 _repathAt = Time.time + repathInterval;
                 if (!TrySetDestination(target))
                 {
-                    EnterIdle();
+                    return true;
                 }
             }
 
-            if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance)
-            {
-                EnterIdle();
-            }
+            return !_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance;
         }
 
-        private Vector3 ClampAwayFromPlayers(Vector3 target)
+        private Vector3 ClampAwayFromPlayers(Vector3 target, float ring)
         {
             if (_players == null)
             {
@@ -478,7 +609,7 @@ namespace _Game.Code.Pets
                 var offset = target - here;
                 offset.y = 0f;
                 var distance = offset.magnitude;
-                if (distance >= panicRadius)
+                if (distance >= ring)
                 {
                     continue;
                 }
@@ -486,7 +617,7 @@ namespace _Game.Code.Pets
                 // Pushed out to the edge of the ring rather than abandoned: the animal
                 // still comes as far as it dares.
                 var direction = distance < 0.0001f ? (transform.position - here).normalized : offset / distance;
-                target = here + direction * panicRadius;
+                target = here + direction * ring;
             }
 
             return target;
@@ -494,12 +625,32 @@ namespace _Game.Code.Pets
 
         // The voice is not raised here: an animal notices a crouching player too, and
         // barking at one would bring Old Man to the very approach the crouch is meant
-        // to buy. Charging it is what it answers, and that is decided in Think.
+        // to buy. What it answers is being charged (decided in Think) or, for a
+        // watchdog, an upright player it has decided to walk at (ReactToSight).
         private void EnterAlert(SensedPlayer player)
         {
+            LookAt(player.Transform.position);
+        }
+
+        /// <summary>
+        /// Stand still and turn towards a spot, and keep doing it for
+        /// <see cref="alertLookTime"/>.
+        ///
+        /// The timer is the whole point. FaceTowards is one RotateTowards step — about
+        /// 6° at 60 fps — so a single call turns the animal almost nowhere. While the
+        /// player is in view this runs every frame anyway and the timer is moot, but
+        /// the look back at the end of a flee happens once, and without something
+        /// holding the state the next frame would fall through to Idle with the animal
+        /// still facing the corner it fled into. That was the "does not turn round"
+        /// reported in Play mode on 2026-08-04.
+        /// </summary>
+        private void LookAt(Vector3 spot)
+        {
             State = PetState.Alert;
+            _alertSpot = spot;
+            _stateTimer = alertLookTime;
             Stop();
-            FaceTowards(player.Transform.position);
+            FaceTowards(spot);
         }
 
         private void EnterIdle()
@@ -507,6 +658,29 @@ namespace _Game.Code.Pets
             State = PetState.Idle;
             _calmFor = 0f;
             Stop();
+        }
+
+        /// <summary>
+        /// The end of a flee: it stops and looks back at whoever it ran from, instead
+        /// of standing there facing the corner it fled into. If nobody is left to look
+        /// at, it simply idles.
+        ///
+        /// Alert, not Idle, on purpose — turning round is often enough to bring the
+        /// player back into the cone, and then the species' own sight reaction decides
+        /// what happens next: the Kitty watches and bolts again if they close in, the
+        /// Dog comes back barking.
+        /// </summary>
+        private void CalmDown()
+        {
+            var nearest = NearestPlayer();
+            if (nearest == null)
+            {
+                EnterIdle();
+                return;
+            }
+
+            _calmFor = 0f;
+            LookAt(nearest.Transform.position);
         }
 
         private void EnterFlee()
@@ -720,6 +894,41 @@ namespace _Game.Code.Pets
             return best;
         }
 
+        /// <summary>
+        /// The closest living player, seen or not. Sight is deliberately not asked:
+        /// this answers "who did I just run from", and an animal that turned a corner
+        /// has not forgotten them — the same reasoning as the flee's own distance
+        /// check.
+        /// </summary>
+        private SensedPlayer NearestPlayer()
+        {
+            if (_players == null)
+            {
+                return null;
+            }
+
+            SensedPlayer best = null;
+            var bestDistance = float.PositiveInfinity;
+
+            for (var i = 0; i < _players.Count; i++)
+            {
+                var player = _players[i];
+                if (!player.IsAlive)
+                {
+                    continue;
+                }
+
+                var distance = HorizontalDistance(player.Transform.position);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = player;
+                }
+            }
+
+            return best;
+        }
+
         private float NearestPlayerDistance()
         {
             var nearest = float.PositiveInfinity;
@@ -799,9 +1008,11 @@ namespace _Game.Code.Pets
             var speed = _agent.velocity.magnitude;
 
             // Vert 0/1 is idle-or-moving, State 0/1 is walk-or-run: the pack's
-            // controllers blend on exactly these two floats and nothing else.
-            _animator.SetFloat(VertParameter, speed > 0.05f ? 1f : 0f);
-            _animator.SetFloat(StateParameter, Mathf.InverseLerp(approachSpeed, fleeSpeed, speed));
+            // controllers blend on exactly these two floats and nothing else. The
+            // hashes live on Pet, next to the code that zeroes them when the animal is
+            // picked up, so the two cannot drift apart.
+            _animator.SetFloat(Pet.VertParameter, speed > 0.05f ? 1f : 0f);
+            _animator.SetFloat(Pet.StateParameter, Mathf.InverseLerp(approachSpeed, fleeSpeed, speed));
         }
     }
 }

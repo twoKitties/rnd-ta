@@ -17,12 +17,13 @@ namespace _Game.Code.UI
         {
             StopFadeOut();
             _canvasGroup.alpha = 1;
+            _canvasGroup.blocksRaycasts = true;
+            _canvasGroup.interactable = true;
             _rotateIconCoroutine = StartCoroutine(RotateIcon());
         }
 
         public void Hide()
         {
-            StopFadeOut();
             _fadeOutCoroutine = StartCoroutine(FadeOut());
         }
 
@@ -30,6 +31,10 @@ namespace _Game.Code.UI
         {
             if(_fadeOutCoroutine != null)
                 StopCoroutine(_fadeOutCoroutine);
+            
+            _canvasGroup.alpha = 0;
+            _canvasGroup.blocksRaycasts = false;
+            _canvasGroup.interactable = false;
         }
 
         private IEnumerator FadeOut()
@@ -41,6 +46,8 @@ namespace _Game.Code.UI
             }
             
             _canvasGroup.alpha = 0;
+            _canvasGroup.blocksRaycasts = false;
+            _canvasGroup.interactable = false;
             StopRotateIcon();
         }
 

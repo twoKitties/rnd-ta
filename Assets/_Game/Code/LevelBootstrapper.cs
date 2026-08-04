@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using FishNet;
 using _Game.Code.AI;
 using _Game.Code.Level;
 using _Game.Code.Noise;
@@ -73,8 +74,27 @@ namespace _Game.Code
 
         private ActorSpawner _spawner;
 
+        /// <summary>
+        /// The raid's entry point, for the avatars that arrive replicated and have to
+        /// find it. Static for the same reason RaidSession.Active is, and it holds no
+        /// per-player state — the players are in the lists below (MECHANICS.md 7.3).
+        /// </summary>
+        public static LevelBootstrapper Current { get; private set; }
+
+        // Who lays the level out. Only the server does; a client receives every actor
+        // as a replicated object and must not create a second set of its own. With no
+        // networking at all — pressing Play straight into this scene — we are our own
+        // server and everything happens locally, which is what keeps the game playable
+        // in one process.
+        private static bool IsAuthority =>
+            InstanceFinder.NetworkManager == null || !InstanceFinder.IsClientStarted || InstanceFinder.IsServerStarted;
+
+        private static bool IsNetworked => InstanceFinder.NetworkManager != null && InstanceFinder.IsServerStarted;
+
         private void Awake()
         {
+            Current = this;
+
             if (spawnsRoot == null)
             {
                 Debug.LogError("LevelBootstrapper: spawnsRoot is not assigned, nothing can be spawned.");
@@ -90,12 +110,17 @@ namespace _Game.Code
             // resolved Seed — never zero — that it would send.
             _spawner = new ActorSpawner(seed);
 
-            var avatars = Place(new[] { playerPrefab }, PointsOf(points, SpawnKind.Player));
+            var playerPoints = PointsOf(points, SpawnKind.Player);
 
-            _pets.AddRange(Place(petPrefabs, PointsOf(points, SpawnKind.Pet)));
+            if (IsAuthority)
+            {
+                SpawnPlayers(playerPoints);
 
-            var oldMen = Place(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
-            OldMan = oldMen.Count > 0 ? oldMen[0] : null;
+                _pets.AddRange(Place(petPrefabs, PointsOf(points, SpawnKind.Pet)));
+
+                var oldMen = Place(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
+                OldMan = oldMen.Count > 0 ? oldMen[0] : null;
+            }
 
             CollectActors();
 
@@ -107,14 +132,70 @@ namespace _Game.Code
                 levelGoal.Bind(_sensedPlayers, _pets);
             }
 
-            // Exactly one avatar exists today and it is ours. Tomorrow this loop runs
-            // once per connection and only one of them passes true.
-            for (var i = 0; i < avatars.Count; i++)
+            BindBrains();
+        }
+
+        private void OnDestroy()
+        {
+            if (Current == this)
             {
-                AddPlayer(avatars[i], i == 0);
+                Current = null;
+            }
+        }
+
+        /// <summary>
+        /// One avatar per connection, each owned by the connection it was made for —
+        /// ownership is what later tells that machine which of the four is theirs.
+        ///
+        /// Off the network there are no connections, so we make the one avatar this
+        /// process is going to look through and claim it outright; that is the case
+        /// that keeps the level playable on its own.
+        /// </summary>
+        private void SpawnPlayers(IReadOnlyList<Transform> playerPoints)
+        {
+            if (!IsNetworked)
+            {
+                var solo = Place(new[] { playerPrefab }, playerPoints);
+                if (solo.Count == 0)
+                {
+                    return;
+                }
+
+                var avatar = solo[0];
+                var local = avatar.GetComponent<LocalAvatar>();
+                if (local != null)
+                {
+                    local.Apply(true);
+                }
+
+                AddPlayer(avatar);
+                return;
             }
 
-            BindBrains();
+            var connections = InstanceFinder.ServerManager.Clients;
+            var drawn = _spawner.Draw(connections.Count, playerPoints.Count);
+            var i = 0;
+
+            foreach (var connection in connections.Values)
+            {
+                if (i >= drawn.Length)
+                {
+                    // Four spawn points, and the lobby already refuses a fifth player.
+                    // Loud rather than silent: an avatar that never appears reads as a
+                    // networking bug and costs far more to find than this line.
+                    Debug.LogError($"LevelBootstrapper: no spawn point left for connection {connection.ClientId}.");
+                    break;
+                }
+
+                var point = playerPoints[drawn[i]];
+                var avatar = Instantiate(playerPrefab, point.position, point.rotation);
+                avatar.name = playerPrefab.name;
+
+                // Registration happens in LocalAvatar.OnStartClient, on every peer,
+                // including this one — spawning is what triggers it.
+                InstanceFinder.ServerManager.Spawn(avatar, connection);
+                i++;
+            }
         }
 
         /// <summary>
@@ -127,12 +208,23 @@ namespace _Game.Code
         /// arrive after the level has started, and both brains hold the live list, so
         /// appending here is all it takes for them to see the newcomer.
         /// </summary>
-        public void AddPlayer(GameObject avatar, bool isLocal)
+        public void AddPlayer(GameObject avatar)
         {
             // Unity object: a destroyed one compares == null but is not a real null.
             if (avatar == null)
             {
                 return;
+            }
+
+            // Called once per peer per avatar, and a client sees its own avatar arrive
+            // the same way it sees everybody else's — so the same avatar must not be
+            // able to enter the roster twice.
+            for (var existing = 0; existing < _sensedPlayers.Count; existing++)
+            {
+                if (_sensedPlayers[existing].Transform == avatar.transform)
+                {
+                    return;
+                }
             }
 
             _sensedPlayers.Add(new SensedPlayer(avatar));
@@ -147,13 +239,11 @@ namespace _Game.Code
                 life.Bind(levelGoal);
             }
 
+            // Whether this one is ours was decided by ownership, in LocalAvatar itself.
+            // Asked rather than told, because the entry point does not create three of
+            // the four avatars and has no way of knowing.
             var local = avatar.GetComponent<LocalAvatar>();
-            if (local != null)
-            {
-                local.Apply(isLocal);
-            }
-
-            if (!isLocal)
+            if (local == null || !local.IsLocal)
             {
                 return;
             }

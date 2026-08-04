@@ -1,3 +1,4 @@
+using FishNet.Object;
 using UnityEngine;
 
 namespace _Game.Code.Player
@@ -17,7 +18,7 @@ namespace _Game.Code.Player
     /// because the alternative — each component asking "am I local?" — spreads the
     /// question over seven files that have no business knowing the answer.
     /// </summary>
-    public class LocalAvatar : MonoBehaviour
+    public class LocalAvatar : NetworkBehaviour
     {
         [Tooltip("Switched on only for our own avatar: camera, AudioListener, the HUD " +
                  "canvas, PlayerController, PlayerInteractor and the two HUD scripts.")]
@@ -31,9 +32,40 @@ namespace _Game.Code.Player
         public bool IsLocal { get; private set; }
 
         /// <summary>
-        /// Claim this avatar, or disown it. Called by the level's entry point today,
-        /// which spawns exactly one avatar and owns it; tomorrow the same call is made
-        /// from whatever tells us which of the four is ours.
+        /// Ownership is the answer, and FishNet is the only thing that knows it: the
+        /// avatar the server spawned for this connection is ours, the other three are
+        /// not. Done here rather than in the level's entry point because a client
+        /// receives the other avatars as replicated objects and never spawns them.
+        /// </summary>
+        public override void OnStartClient()
+        {
+            base.OnStartClient();
+            Apply(IsOwner);
+
+            // Registered from the avatar rather than by whoever created it, for the
+            // same reason: three of the four were not created here at all. The level's
+            // entry point exists on every peer, so both the AI's view of the players
+            // and the outcome's list are filled the same way everywhere.
+            if (LevelBootstrapper.Current != null)
+            {
+                LevelBootstrapper.Current.AddPlayer(gameObject);
+            }
+        }
+
+        public override void OnStopClient()
+        {
+            base.OnStopClient();
+
+            if (LevelBootstrapper.Current != null)
+            {
+                LevelBootstrapper.Current.RemovePlayer(gameObject);
+            }
+        }
+
+        /// <summary>
+        /// Claim this avatar, or disown it. Public because a scene without any
+        /// networking — pressing Play straight into the level — still has to get a
+        /// working camera, and there is nobody to ask about ownership there.
         /// </summary>
         public void Apply(bool isLocal)
         {

@@ -17,10 +17,32 @@ namespace _Game.Code.Level
     {
         [SerializeField] private BeamZone beamZone;
 
-        public int Delivered { get; private set; }
-        public int Total { get; private set; }
-        public bool IsWon { get; private set; }
-        public bool IsLost { get; private set; }
+        // Replicated when a raid is networked, local when it is not. Deliberately a
+        // plain MonoBehaviour holding a reference rather than a NetworkBehaviour: this
+        // component shares a GameObject with LevelBootstrapper, and FishNet deactivates
+        // a scene object whose NetworkObject fails to come up — see the note on
+        // RaidState.
+        private static RaidState Shared => RaidState.Current;
+
+        public int Delivered => Shared == null ? _delivered : Shared.Delivered;
+        public int Total => Shared == null ? _total : Shared.Total;
+        public bool IsWon => Shared == null ? _isWon : Shared.IsWon;
+        public bool IsLost => Shared == null ? _isLost : Shared.IsLost;
+
+        // The same four, for a level played with no networking at all. One of the two
+        // sets is live at a time and the properties above pick which.
+        private int _delivered;
+        private int _total;
+        private bool _isWon;
+        private bool _isLost;
+
+        // Whether the animal count has been handed to RaidState yet. It cannot be done
+        // in Bind: the object is spawned in the same frame and does not exist for us
+        // until FishNet says so.
+        private bool _totalPushed;
+
+        // Who decides. Off the network we do; on it, the server.
+        private static bool IsAuthority => Shared == null || Shared.IsAuthority;
 
         // The same view of a player the brains get. It already answers the only two
         // questions the outcome asks — where are they, and are they still alive — and
@@ -34,9 +56,22 @@ namespace _Game.Code.Level
 
         public void Bind(IReadOnlyList<SensedPlayer> players, IReadOnlyList<GameObject> pets)
         {
+            // The roster is read locally by everyone — the AI and the HUD both look at
+            // it. The counters are shared state, and only the authority sets them.
             _players = players;
-            Total = pets == null ? 0 : pets.Count;
-            Delivered = 0;
+
+            if (!IsAuthority)
+            {
+                return;
+            }
+
+            // Recorded locally either way. Spawning RaidState does not make it exist
+            // this frame — FishNet raises OnStartClient later — so binding cannot rely
+            // on it being there yet, and Update below pushes the number across as soon
+            // as it is.
+            _total = pets == null ? 0 : pets.Count;
+            _delivered = 0;
+            _totalPushed = false;
         }
 
         /// <summary>
@@ -86,8 +121,20 @@ namespace _Game.Code.Level
             // peer will run — the animal disappears into the saucer on all four
             // screens. This line is bookkeeping owned by whoever decides, and running
             // it everywhere would count the same animal up to four times.
-            Delivered++;
-            Debug.Log($"Beam: {pet.name} handed over ({Delivered}/{Total}).");
+            if (IsAuthority)
+            {
+                if (Shared == null)
+                {
+                    _delivered++;
+                }
+                else
+                {
+                    Shared.AddDelivery();
+                }
+
+                Debug.Log($"Beam: {pet.name} handed over ({Delivered}/{Total}).");
+            }
+
             return true;
         }
 
@@ -156,13 +203,20 @@ namespace _Game.Code.Level
         /// </summary>
         public void ApplyOutcome(bool won, bool lost)
         {
-            if (IsWon || IsLost)
+            if (IsWon || IsLost || !IsAuthority)
             {
                 return;
             }
 
-            IsWon = won;
-            IsLost = lost;
+            if (Shared == null)
+            {
+                _isWon = won;
+                _isLost = lost;
+            }
+            else
+            {
+                Shared.SetOutcome(won, lost);
+            }
 
             if (lost)
             {
@@ -176,14 +230,27 @@ namespace _Game.Code.Level
 
         private void Update()
         {
+            // Only the authority judges; everybody else is told, through RaidState. The
+            // shape of the code did not change when that became true (MECHANICS.md
+            // 7.4) — only who reaches this line.
+            if (!IsAuthority)
+            {
+                return;
+            }
+
+            // The moment the replicated state arrives, it gets the number the level was
+            // laid out with. Once only — after this the counter is its own.
+            if (!_totalPushed && Shared != null)
+            {
+                Shared.SetTotal(_total);
+                _totalPushed = true;
+            }
+
             if (IsWon || IsLost)
             {
                 return;
             }
 
-            // Today the same machine asks and answers. Tomorrow only the host reaches
-            // the first line, and the second arrives from it — the shape does not
-            // change (MECHANICS.md 7.4).
             if (EvaluateOutcome(out var won, out var lost))
             {
                 ApplyOutcome(won, lost);

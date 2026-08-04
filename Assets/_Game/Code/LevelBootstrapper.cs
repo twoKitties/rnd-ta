@@ -43,6 +43,10 @@ namespace _Game.Code
 
         [SerializeField] private LevelGoal levelGoal;
 
+        [Tooltip("Carries the raid's counters and outcome to every client. Spawned by " +
+                 "the server only; with no networking the goal keeps them itself.")]
+        [SerializeField] private GameObject raidStatePrefab;
+
         [Header("Spawning")]
         [Tooltip("0 draws a fresh layout every run; any other value repeats the same one.")]
         [SerializeField] private int seed;
@@ -125,6 +129,10 @@ namespace _Game.Code
 
             CollectActors();
 
+            // Before the goal is bound: binding sets the animal count, and that number
+            // has to land in the replicated state rather than in a local field.
+            SpawnRaidState();
+
             // Before the players are added: the goal holds the live player list rather
             // than a copy of it, so it must be bound once and then simply sees whoever
             // joins later.
@@ -142,6 +150,21 @@ namespace _Game.Code
             {
                 Current = null;
             }
+        }
+
+        // Only the server makes it, and only when there is a network to carry it. Off
+        // the network LevelGoal keeps the same four numbers in its own fields, which is
+        // what keeps this level playable on its own.
+        private void SpawnRaidState()
+        {
+            if (!IsNetworked || raidStatePrefab == null)
+            {
+                return;
+            }
+
+            var state = Instantiate(raidStatePrefab);
+            state.name = raidStatePrefab.name;
+            InstanceFinder.ServerManager.Spawn(state);
         }
 
         /// <summary>

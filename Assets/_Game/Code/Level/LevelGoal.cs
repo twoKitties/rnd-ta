@@ -8,7 +8,7 @@ namespace _Game.Code.Level
 {
     /// <summary>
     /// Owns the outcome of the match: how many animals have been handed over, and
-    /// whether the raid is won (MECHANICS.md section 6). Lives next to Bootstrapper,
+    /// whether the raid is won (MECHANICS.md section 6). Lives next to LevelBootstrapper,
     /// which binds it to the actors it spawned — nothing here searches the scene
     /// (7.6). Under 7.4 this is the authority: today it runs locally, tomorrow only
     /// on the host.
@@ -109,7 +109,7 @@ namespace _Game.Code.Level
             won = false;
             lost = false;
 
-            // Nobody bound yet — an unopened scene, a missing reference on Bootstrapper,
+            // Nobody bound yet — an unopened scene, a missing reference on LevelBootstrapper,
             // and tomorrow a client whose player list fills in after the first frame.
             // Without this the count below reads "no living players" and latches the
             // loss on frame one, permanently: an empty set has no outcome to judge.

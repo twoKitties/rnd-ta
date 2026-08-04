@@ -82,7 +82,7 @@ namespace _Game.Code.Player
         }
 
         /// <summary>
-        /// Handed over by Bootstrapper right after this avatar is spawned: the goal
+        /// Handed over by LevelBootstrapper right after this avatar is spawned: the goal
         /// is a scene object, so a spawned prefab cannot reference it up front.
         /// </summary>
         public void Bind(LevelGoal goal)

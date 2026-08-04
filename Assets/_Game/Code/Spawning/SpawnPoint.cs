@@ -12,7 +12,7 @@ namespace _Game.Code.Spawning
     /// <summary>
     /// Marks a place an actor may start from. Lives on the three marker prefabs in
     /// Assets/_Game/Content/Level/Spawns/, so every marker dropped into the level
-    /// carries it already and Bootstrapper picks new points up without rewiring.
+    /// carries it already and LevelBootstrapper picks new points up without rewiring.
     /// </summary>
     public class SpawnPoint : MonoBehaviour
     {

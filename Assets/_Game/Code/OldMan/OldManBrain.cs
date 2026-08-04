@@ -163,7 +163,7 @@ namespace _Game.Code.OldMan
         }
 
         /// <summary>
-        /// Handed the world by Bootstrapper right after he is spawned: the players,
+        /// Handed the world by LevelBootstrapper right after he is spawned: the players,
         /// the noise sources and the patrol points are other spawned actors or scene
         /// objects, so a prefab cannot reference them up front (MECHANICS.md 7.6).
         /// </summary>

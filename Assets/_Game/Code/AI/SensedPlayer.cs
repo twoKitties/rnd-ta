@@ -5,7 +5,7 @@ namespace _Game.Code.AI
 {
     /// <summary>
     /// One player as an AI sees them: where they are, how loudly they are moving and
-    /// whether they still count. Built once when Bootstrapper binds an actor, so that
+    /// whether they still count. Built once when LevelBootstrapper binds an actor, so that
     /// no brain does GetComponent in Update and none of them searches the scene
     /// (MECHANICS.md 7.6).
     ///

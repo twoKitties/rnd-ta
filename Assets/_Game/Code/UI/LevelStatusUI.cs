@@ -18,7 +18,7 @@ namespace _Game.Code.UI
         private string _shownCounter;
         private string _shownResult;
 
-        /// <summary>Bound by Bootstrapper: the goal is a scene object.</summary>
+        /// <summary>Bound by LevelBootstrapper: the goal is a scene object.</summary>
         public void Bind(LevelGoal goal)
         {
             _goal = goal;

@@ -28,7 +28,7 @@ namespace _Game.Code.Player
         private LevelGoal _goal;
 
         /// <summary>
-        /// Handed over by Bootstrapper right after this avatar is spawned, the same
+        /// Handed over by LevelBootstrapper right after this avatar is spawned, the same
         /// way PlayerInteractor is: the goal is a scene object, so a spawned prefab
         /// cannot reference it up front (MECHANICS.md 7.6).
         /// </summary>

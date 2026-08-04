@@ -31,9 +31,9 @@ namespace _Game.Code.Pets
         Alert,
 
         /// <summary>
-        /// Comes at them barking and stops at the panic ring. The Dog — a watchdog,
-        /// which is why walking up to one costs a bark and therefore Old Man, while
-        /// sneaking up to it still costs nothing.
+        /// Comes at them barking and stops at its watch distance. The Dog — a
+        /// watchdog, which is why walking up to one costs a bark and therefore Old
+        /// Man, while sneaking up to it still costs nothing.
         /// </summary>
         Approach
     }
@@ -66,7 +66,7 @@ namespace _Game.Code.Pets
     ///    still and is trusted may walk right up to any of them — that is the entire
     ///    luring mechanic.
     /// 4. Seen player it does not fear → the species' sight reaction: watch them, or
-    ///    come at them barking and stop on the panic ring.
+    ///    come at them barking and stop at the watch distance.
     /// 5. Heard something ≥ its threshold → the species' reaction. Sight always beats
     ///    noise (4.1, 4.3), which is why this is below both checks above.
     /// 6. Nothing for the calm-down time → idle.
@@ -220,7 +220,7 @@ namespace _Game.Code.Pets
         }
 
         /// <summary>
-        /// Handed the world by Bootstrapper right after this animal is spawned: the
+        /// Handed the world by LevelBootstrapper right after this animal is spawned: the
         /// players and the noise sources are other spawned actors, so a prefab cannot
         /// reference them up front (MECHANICS.md 7.6).
         /// </summary>

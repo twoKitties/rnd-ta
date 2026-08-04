@@ -12,7 +12,7 @@ using UnityEngine;
 namespace _Game.Code
 {
     /// <summary>
-    /// The scene's entry point. Every reference the level needs at startup is wired
+    /// The level's entry point. Every reference the level needs at startup is wired
     /// here, and everything that has to happen before gameplay starts happens here —
     /// today that means placing the actors on their spawn points.
     ///
@@ -20,8 +20,12 @@ namespace _Game.Code
     /// from this component rather than looking them up by name or type
     /// (MECHANICS.md 7.6) — an actor that does not exist until Awake cannot be
     /// referenced by another prefab up front.
+    ///
+    /// Named for the level on purpose: the application's own entry point is
+    /// <see cref="App.LevelBootstrapper"/> in the Loading scene, and it is a different
+    /// thing with a different lifetime — this one dies with the raid.
     /// </summary>
-    public class Bootstrapper : MonoBehaviour
+    public class LevelBootstrapper : MonoBehaviour
     {
         [Header("Prefabs")]
         [SerializeField] private GameObject playerPrefab;
@@ -73,7 +77,7 @@ namespace _Game.Code
         {
             if (spawnsRoot == null)
             {
-                Debug.LogError("Bootstrapper: spawnsRoot is not assigned, nothing can be spawned.");
+                Debug.LogError("LevelBootstrapper: spawnsRoot is not assigned, nothing can be spawned.");
                 return;
             }
 
@@ -214,7 +218,7 @@ namespace _Game.Code
             {
                 // Loud on purpose: an actor that silently never reaches the level
                 // reads as a broken AI later and costs far more to find than this.
-                Debug.LogError($"Bootstrapper: {prefabs.Count} prefab(s) to place but only " +
+                Debug.LogError($"LevelBootstrapper: {prefabs.Count} prefab(s) to place but only " +
                                $"{(points == null ? 0 : points.Count)} spawn point(s). Some actors will be missing.");
             }
 
@@ -223,7 +227,7 @@ namespace _Game.Code
                 var prefab = prefabs[i];
                 if (prefab == null)
                 {
-                    Debug.LogError($"Bootstrapper: prefab at index {i} is not assigned, skipped.");
+                    Debug.LogError($"LevelBootstrapper: prefab at index {i} is not assigned, skipped.");
                     continue;
                 }
 

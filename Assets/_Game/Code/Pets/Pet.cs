@@ -1,4 +1,7 @@
 using _Game.Code.Player;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -29,7 +32,7 @@ namespace _Game.Code.Pets
     /// client asks, the host runs TryTake, and every peer runs Apply* off replicated
     /// state — none of the three needs rewriting, only wiring.
     /// </summary>
-    public class Pet : MonoBehaviour
+    public class Pet : NetworkBehaviour
     {
         [Header("Carrying (MECHANICS.md section 2)")]
         [SerializeField] private float carrySpeedMultiplier = 1f;
@@ -78,6 +81,23 @@ namespace _Game.Code.Pets
         private NavMeshAgent _agent;
         private CapsuleCollider _capsule;
 
+        // Asked through the NetworkObject rather than through NetworkBehaviour's own
+        // IsSpawned: that property throws when the behaviour was never initialised,
+        // which is exactly the case for an animal in a level played with no networking
+        // (measured 2026-08-05 on LevelGoal).
+        private NetworkObject _nob;
+
+        private bool IsReplicated => _nob != null && _nob.IsSpawned;
+
+        /// <summary>Where the decisions are taken: the server, or us when alone.</summary>
+        private bool IsAuthority => !IsReplicated || _nob.IsServerInitialized;
+
+        // Who is carrying this animal, as shared state. A reference to the carrier's
+        // networked avatar, because a component reference means nothing on another
+        // machine. Every peer applies the change below, which is what makes the animal
+        // ride the right pair of hands on all four screens.
+        private readonly SyncVar<NetworkObject> _carrierObject = new SyncVar<NetworkObject>();
+
         // Presentation of being carried lives here rather than in PetBrain, because
         // the brain is the animal's decision-making and will run on one machine only,
         // while being carried has to look and sound the same on all of them.
@@ -118,6 +138,36 @@ namespace _Game.Code.Pets
             _capsule = GetComponent<CapsuleCollider>();
             _animator = GetComponent<Animator>();
             _voice = GetComponent<PetVoice>();
+            _nob = GetComponent<NetworkObject>();
+
+            _carrierObject.OnChange += OnCarrierChanged;
+        }
+
+        private void OnDestroy()
+        {
+            _carrierObject.OnChange -= OnCarrierChanged;
+        }
+
+        // The one place the change is applied, on every peer. The authority writes the
+        // reference; everybody — including the authority — reacts here, so the picture
+        // is produced by exactly one path (MECHANICS.md 7.4).
+        private void OnCarrierChanged(NetworkObject previous, NetworkObject next, bool asServer)
+        {
+            if (next == null)
+            {
+                if (_isCarried)
+                {
+                    ApplyRelease(FindDropPosition(Carrier == null ? transform : Carrier.transform));
+                }
+
+                return;
+            }
+
+            var hands = next.GetComponent<PlayerHands>();
+            if (hands != null)
+            {
+                ApplyCarry(hands);
+            }
         }
 
         /// <summary>
@@ -135,7 +185,12 @@ namespace _Game.Code.Pets
             return Vector3.Distance(hands.transform.position, transform.position) <= captureDistance;
         }
 
-        /// <summary>Picks the animal up if the rule allows it.</summary>
+        /// <summary>
+        /// Picks the animal up if the rule allows it. On a client this is a request:
+        /// the host re-runs <see cref="CanBeTakenBy"/> over it, because two machines
+        /// disagree about a 1.5 m distance often enough to matter and only one answer
+        /// may win (MECHANICS.md 7.4).
+        /// </summary>
         public bool TryTake(PlayerHands hands)
         {
             if (!CanBeTakenBy(hands))
@@ -143,8 +198,54 @@ namespace _Game.Code.Pets
                 return false;
             }
 
-            ApplyCarry(hands);
+            if (IsAuthority)
+            {
+                Take(hands);
+                return true;
+            }
+
+            var asker = hands.GetComponent<NetworkObject>();
+            if (asker == null)
+            {
+                return false;
+            }
+
+            RequestTake(asker);
             return true;
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void RequestTake(NetworkObject asker, NetworkConnection sender = null)
+        {
+            // The avatar has to belong to whoever asked: a client may pick an animal up
+            // with its own hands and nobody else's.
+            if (asker == null || sender == null || asker.Owner != sender)
+            {
+                return;
+            }
+
+            var hands = asker.GetComponent<PlayerHands>();
+            if (hands != null && CanBeTakenBy(hands))
+            {
+                Take(hands);
+            }
+        }
+
+        // The decision, taken once. Off the network it applies straight away; on it,
+        // the replicated reference is what carries it to everybody, this peer included.
+        private void Take(PlayerHands hands)
+        {
+            if (!IsReplicated)
+            {
+                ApplyCarry(hands);
+                return;
+            }
+
+            var carrier = hands.GetComponent<NetworkObject>();
+            if (carrier != null)
+            {
+                _carrierObject.Value = carrier;
+            }
         }
 
         /// <summary>
@@ -172,10 +273,37 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            // Carrier == null here means it was destroyed while carrying; the animal
-            // then drops where it is rather than at a carrier that no longer exists.
-            var where = Carrier == null ? transform.position : FindDropPosition(Carrier.transform);
-            ApplyRelease(where);
+            if (!IsReplicated)
+            {
+                // Carrier == null here means it was destroyed while carrying; the animal
+                // then drops where it is rather than at a carrier that no longer exists.
+                var where = Carrier == null ? transform.position : FindDropPosition(Carrier.transform);
+                ApplyRelease(where);
+                return;
+            }
+
+            if (IsAuthority)
+            {
+                // Clearing the reference is the whole of it: every peer, this one
+                // included, puts the animal down in OnCarrierChanged.
+                _carrierObject.Value = null;
+                return;
+            }
+
+            RequestRelease();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void RequestRelease(NetworkConnection sender = null)
+        {
+            // Only the carrier may put it down, and the carrier is what the server has
+            // recorded — not what the asking client claims.
+            if (sender == null || _carrierObject.Value == null || _carrierObject.Value.Owner != sender)
+            {
+                return;
+            }
+
+            _carrierObject.Value = null;
         }
 
         // After the carrier has already moved this frame, so the load does not lag a
@@ -320,7 +448,11 @@ namespace _Game.Code.Pets
                 _capsule.enabled = true;
             }
 
-            if (_agent != null)
+            // Only where the animal is actually simulated. On a client the agent was
+            // switched off by ServerSimulated on purpose — turning it back on here
+            // would give that machine an animal walking a path of its own, fighting the
+            // position arriving over the wire.
+            if (_agent != null && IsAuthority)
             {
                 // Re-enabled after the move, and warped rather than just switched on:
                 // an agent keeps its own idea of where it is, and would drag the animal

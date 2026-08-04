@@ -1,4 +1,7 @@
 using _Game.Code.Noise;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 namespace _Game.Code.Doors
@@ -12,7 +15,7 @@ namespace _Game.Code.Doors
     /// hinge: the leaf occupies local +X from the pivot, so a local Y rotation is
     /// the whole mechanic and no extra rig is needed.
     /// </summary>
-    public class Door : MonoBehaviour
+    public class Door : NetworkBehaviour
     {
         [Header("Swing (MECHANICS.md section 2)")]
         [SerializeField] private float openAngle = 90f;
@@ -21,6 +24,17 @@ namespace _Game.Code.Doors
         [Header("Noise (MECHANICS.md section 2)")]
         [Tooltip("As loud as a step: above Old Man's threshold, below the animals'.")]
         [SerializeField] private float useNoise = 25f;
+
+        [Header("Authority")]
+        [Tooltip("How far from the leaf a request is still believed, world m. Generous " +
+                 "against the player's own reach of 1.5: this is a sanity check against " +
+                 "a door being opened across the house, not a second reach rule.")]
+        [SerializeField] private float serverReach = 3f;
+
+        // The one piece of this leaf that travels. Every peer applies it, so a door
+        // opened by one player is open for everybody — and, just as importantly, for
+        // the pets' pathing, which reads IsOpen (MECHANICS.md 4.6).
+        private readonly SyncVar<float> _swing = new SyncVar<float>();
 
         /// <summary>
         /// True once the leaf has been asked to open. The pets' AI (block 4) reads
@@ -46,17 +60,70 @@ namespace _Game.Code.Doors
         /// </summary>
         public void Use(Transform actor)
         {
-            // The noise belongs to whoever pulled the handle, not to the leaf:
-            // MECHANICS.md 7.5 keeps noise on actors. The side effect is the right
-            // one — Old Man walks to where the player stood, not to where the leaf
-            // hangs. An actor with no emitter (Old Man himself) opens doors quietly.
+            // No networking at all — the level opened on its own. We are our own
+            // authority, and this is the whole of it.
+            if (!IsSpawned)
+            {
+                EmitNoise(actor);
+                ApplySwing(SwingFor(actor));
+                return;
+            }
+
+            if (IsServerInitialized)
+            {
+                ServerUse(actor);
+                return;
+            }
+
+            // A client only asks. It does not send where it is standing either — the
+            // host works that out from the avatar this connection owns, so the side the
+            // leaf swings to cannot be argued about (MECHANICS.md 7.4).
+            RequestUse();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void RequestUse(NetworkConnection sender = null)
+        {
+            if (sender == null || sender.FirstObject == null)
+            {
+                return;
+            }
+
+            var actor = sender.FirstObject.transform;
+
+            // The host re-runs the rule it would have run for itself, including the
+            // reach check the asking client already did — a request is not a fact.
+            if (Vector3.Distance(actor.position, transform.position) > serverReach)
+            {
+                return;
+            }
+
+            ServerUse(actor);
+        }
+
+        // The decision, taken once, on the machine that owns the rules.
+        private void ServerUse(Transform actor)
+        {
+            // Emitted here rather than on the asking client: Old Man listens on the
+            // server, and noise made on somebody else's machine is noise he never
+            // hears. The noise still belongs to the actor, not to the leaf
+            // (MECHANICS.md 7.5) — it is the actor's copy on this machine that emits.
+            EmitNoise(actor);
+
+            // The state change travels as one float and every peer applies it below.
+            _swing.Value = SwingFor(actor);
+        }
+
+        private void EmitNoise(Transform actor)
+        {
+            // The side effect is the right one — Old Man walks to where the player
+            // stood, not to where the leaf hangs. An actor with no emitter (Old Man
+            // himself) opens doors quietly.
             var noise = actor.GetComponent<NoiseEmitter>();
             if (noise != null)
             {
                 noise.Emit(useNoise);
             }
-
-            ApplySwing(SwingFor(actor));
         }
 
         /// <summary>
@@ -95,6 +162,23 @@ namespace _Game.Code.Doors
         {
             _targetAngle = targetAngle;
             IsOpen = !Mathf.Approximately(targetAngle, 0f);
+        }
+
+        private void Awake()
+        {
+            // Driven from the replicated value rather than from whoever asked, so the
+            // server's own copy and every client's go through exactly one line.
+            _swing.OnChange += OnSwingChanged;
+        }
+
+        private void OnDestroy()
+        {
+            _swing.OnChange -= OnSwingChanged;
+        }
+
+        private void OnSwingChanged(float previous, float next, bool asServer)
+        {
+            ApplySwing(next);
         }
 
         // Update, not FixedUpdate: the leaf is a plain collider with no Rigidbody, so

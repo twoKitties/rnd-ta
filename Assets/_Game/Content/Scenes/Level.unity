@@ -4286,6 +4286,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2380103035758461810, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 2079260558
+      objectReference: {fileID: 0}
+    - target: {fileID: 2584043414300795285, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 2146336655
+      objectReference: {fileID: 0}
+    - target: {fileID: 2668436482226571461, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 4294868367
+      objectReference: {fileID: 0}
     - target: {fileID: 2990003985773422217, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -4326,9 +4338,37 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3662817467825062664, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 4293717438
+      objectReference: {fileID: 0}
+    - target: {fileID: 3787352288138068498, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 2146402206
+      objectReference: {fileID: 0}
+    - target: {fileID: 3787352288138068498, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: WasActiveDuringEdit
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5701148500399450904, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 1878884239
+      objectReference: {fileID: 0}
     - target: {fileID: 6013715144977740232, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
       propertyPath: m_Name
       value: HouseOneFloor
+      objectReference: {fileID: 0}
+    - target: {fileID: 6433431885160088315, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 2147319775
+      objectReference: {fileID: 0}
+    - target: {fileID: 8531450236406557445, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 3958308846
+      objectReference: {fileID: 0}
+    - target: {fileID: 9085635824590936262, guid: 390d1d9dbc07a5b4a8f74a9696996153, type: 3}
+      propertyPath: SceneId
+      value: 1810817022
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

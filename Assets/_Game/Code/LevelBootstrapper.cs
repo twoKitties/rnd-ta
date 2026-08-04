@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using FishNet;
+using FishNet.Connection;
+using FishNet.Managing.Scened;
 using FishNet.Object;
+using FishNet.Transporting;
 using _Game.Code.AI;
 using _Game.Code.Level;
 using _Game.Code.Noise;
@@ -79,6 +82,12 @@ namespace _Game.Code
 
         private ActorSpawner _spawner;
 
+        // Gathered in Awake, used when the level is actually laid out — which on a
+        // networked raid is several frames later.
+        private SpawnPoint[] _points;
+
+        private bool _laidOut;
+
         /// <summary>
         /// The raid's entry point, for the avatars that arrive replicated and have to
         /// find it. Static for the same reason RaidSession.Active is, and it holds no
@@ -115,15 +124,106 @@ namespace _Game.Code
             // resolved Seed — never zero — that it would send.
             _spawner = new ActorSpawner(seed);
 
-            var playerPoints = PointsOf(points, SpawnKind.Player);
+            _points = points;
+
+            // Off the network there is nobody to wait for, and on a client nothing is
+            // created here anyway — both lay out immediately and behave exactly as
+            // before.
+            if (!IsNetworked)
+            {
+                LayOut();
+                return;
+            }
+
+            // On the server, waiting is the whole point. FishNet activates this scene —
+            // which is what runs this Awake — and only *then* broadcasts "load Level"
+            // to the clients (Scened/SceneManager.cs, the LoadScenesBroadcast after the
+            // load loop). Spawning here would send every actor to peers that have no
+            // scene to put them in: measured 2026-08-05, the client's animals landed in
+            // the Lobby with no navmesh, its avatar fell through a floor that did not
+            // exist yet, and — worst — when Level finally arrived FishNet disabled every
+            // scene NetworkObject in it to await spawn messages the server had already
+            // sent. The house is one of those objects, so it stayed switched off for
+            // good, taking the floor with it.
+            InstanceFinder.SceneManager.OnClientPresenceChangeEnd += OnClientPresenceChangeEnd;
+            InstanceFinder.ServerManager.OnRemoteConnectionState += OnConnectionStateForLayout;
+            LayOutWhenEveryoneHasTheScene();
+        }
+
+        private void OnDestroy()
+        {
+            Unsubscribe();
+
+            if (Current == this)
+            {
+                Current = null;
+            }
+        }
+
+        private void Unsubscribe()
+        {
+            if (InstanceFinder.NetworkManager == null)
+            {
+                return;
+            }
+
+            InstanceFinder.SceneManager.OnClientPresenceChangeEnd -= OnClientPresenceChangeEnd;
+            InstanceFinder.ServerManager.OnRemoteConnectionState -= OnConnectionStateForLayout;
+        }
+
+        // A connection finished loading this scene. Asked again rather than counted,
+        // because the answer is "all of them", not "one more".
+        private void OnClientPresenceChangeEnd(ClientPresenceChangeEventArgs args)
+        {
+            LayOutWhenEveryoneHasTheScene();
+        }
+
+        // Somebody dropped while the others were still loading. Without this the raid
+        // would wait for a connection that no longer exists, for ever.
+        private void OnConnectionStateForLayout(NetworkConnection connection, RemoteConnectionStateArgs args)
+        {
+            if (args.ConnectionState != RemoteConnectionState.Started)
+            {
+                LayOutWhenEveryoneHasTheScene();
+            }
+        }
+
+        private void LayOutWhenEveryoneHasTheScene()
+        {
+            if (_laidOut)
+            {
+                return;
+            }
+
+            var scene = gameObject.scene;
+            foreach (var connection in InstanceFinder.ServerManager.Clients.Values)
+            {
+                if (!connection.Scenes.Contains(scene))
+                {
+                    return;
+                }
+            }
+
+            Unsubscribe();
+            LayOut();
+        }
+
+        /// <summary>
+        /// Build the raid: the actors, the registry, the replicated state and the
+        /// bindings, in that order. Split out of Awake so that the moment it happens is
+        /// a decision rather than a side effect of the scene activating.
+        /// </summary>
+        private void LayOut()
+        {
+            _laidOut = true;
 
             if (IsAuthority)
             {
-                SpawnPlayers(playerPoints);
+                SpawnPlayers(PointsOf(_points, SpawnKind.Player));
 
-                _pets.AddRange(Place(petPrefabs, PointsOf(points, SpawnKind.Pet)));
+                _pets.AddRange(Place(petPrefabs, PointsOf(_points, SpawnKind.Pet)));
 
-                var oldMen = Place(new[] { oldManPrefab }, PointsOf(points, SpawnKind.OldMan));
+                var oldMen = Place(new[] { oldManPrefab }, PointsOf(_points, SpawnKind.OldMan));
                 OldMan = oldMen.Count > 0 ? oldMen[0] : null;
             }
 
@@ -142,14 +242,6 @@ namespace _Game.Code
             }
 
             BindBrains();
-        }
-
-        private void OnDestroy()
-        {
-            if (Current == this)
-            {
-                Current = null;
-            }
         }
 
         // Only the server makes it, and only when there is a network to carry it. Off

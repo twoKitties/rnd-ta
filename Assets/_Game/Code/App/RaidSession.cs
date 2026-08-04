@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using FishNet;
 using FishNet.Connection;
 using FishNet.Managing.Scened;
@@ -80,6 +83,86 @@ namespace _Game.Code.App
         /// <summary>True on the machine that is hosting — the one that owns the rules.</summary>
         public bool IsHost => InstanceFinder.IsServerStarted;
 
+        /// <summary>
+        /// The address to read out to the other players, as <c>ip:port</c>.
+        ///
+        /// Found by asking a UDP socket which interface it would use to reach the
+        /// outside world, rather than by taking the first address the machine lists:
+        /// a developer's machine has Bluetooth, Hyper-V, VPN and link-local adapters
+        /// too, and picking the wrong one hands out an address nobody can reach. No
+        /// packet is sent — connecting a UDP socket only chooses a route.
+        /// </summary>
+        public string LocalEndpoint => $"{LocalAddress()}:{port}";
+
+        /// <summary>
+        /// Every IPv4 address this machine has that somebody could plausibly connect
+        /// to, best guess first. Public because when the first guess is wrong the
+        /// player needs to see the alternatives rather than be told one wrong number.
+        /// </summary>
+        public static List<string> LocalAddresses()
+        {
+            var wifi = new List<string>();
+            var wired = new List<string>();
+            var other = new List<string>();
+
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up ||
+                    nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                {
+                    continue;
+                }
+
+                foreach (var entry in nic.GetIPProperties().UnicastAddresses)
+                {
+                    if (entry.Address.AddressFamily != AddressFamily.InterNetwork)
+                    {
+                        continue;
+                    }
+
+                    var text = entry.Address.ToString();
+
+                    // 169.254.x is what Windows invents for an adapter with no DHCP —
+                    // a cable that is not plugged in, Bluetooth, an idle virtual NIC.
+                    // Nobody can reach it.
+                    if (text.StartsWith("169.254"))
+                    {
+                        continue;
+                    }
+
+                    if (nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                    {
+                        wifi.Add(text);
+                    }
+                    else if (nic.NetworkInterfaceType == NetworkInterfaceType.Ethernet)
+                    {
+                        wired.Add(text);
+                    }
+                    else
+                    {
+                        other.Add(text);
+                    }
+                }
+            }
+
+            // Wi-Fi and cable first, tunnels last. Measured 2026-08-05 on this machine:
+            // asking the routing table which interface reaches the internet returned the
+            // VPN's 10.69.64.9, not the 192.168.0.63 the other machine in the room has
+            // to use — an active VPN owns the default route and would hand out an
+            // address nobody on the LAN can connect to.
+            var all = new List<string>();
+            all.AddRange(wifi);
+            all.AddRange(wired);
+            all.AddRange(other);
+            return all;
+        }
+
+        private string LocalAddress()
+        {
+            var all = LocalAddresses();
+            return all.Count == 0 ? "?" : all[0];
+        }
+
         private void Awake()
         {
             if (Active != null && Active != this)
@@ -142,6 +225,11 @@ namespace _Game.Code.App
                 Fail($"Не удалось занять порт {port}");
                 return false;
             }
+
+            // Every candidate, not just the one shown in the lobby: with a VPN up the
+            // best guess can still be the wrong one, and the player needs to be able to
+            // try the next.
+            Debug.Log($"RaidSession: hosting on port {port}. Addresses: {string.Join(", ", LocalAddresses())}");
 
             BeginAttempt();
             if (InstanceFinder.ClientManager.StartConnection(hostAddress, port))

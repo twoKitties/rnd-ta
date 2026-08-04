@@ -1,4 +1,5 @@
 using _Game.Code.Level;
+using _Game.Code.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -18,6 +19,15 @@ namespace _Game.Code.UI
         private string _shownCounter;
         private string _shownResult;
 
+        // This HUD lives on the avatar it belongs to, so the death it reports is that
+        // avatar's own — no lookup and no "which player is this" question.
+        private PlayerLife _life;
+
+        private void Awake()
+        {
+            _life = GetComponent<PlayerLife>();
+        }
+
         /// <summary>Bound by LevelBootstrapper: the goal is a scene object.</summary>
         public void Bind(LevelGoal goal)
         {
@@ -26,16 +36,28 @@ namespace _Game.Code.UI
 
         private void Update()
         {
+            // Being dead is reported even with no goal bound: it is the one thing the
+            // player must be told, and it stays on screen while they watch the rest of
+            // the raid as a spectator (MECHANICS.md 3.7).
+            // Unity object: a destroyed one compares == null but is not a real null.
+            var dead = _life != null && _life.IsDead;
+
             if (_goal == null)
             {
                 Write(counter, ref _shownCounter, string.Empty);
-                Write(result, ref _shownResult, string.Empty);
+                Write(result, ref _shownResult, dead ? "YOU DIED" : string.Empty);
                 return;
             }
 
             Write(counter, ref _shownCounter, $"Pets: {_goal.Delivered}/{_goal.Total}");
 
-            var outcome = _goal.IsWon ? "YOU WIN" : _goal.IsLost ? "RAID FAILED" : string.Empty;
+            // The raid's outcome outranks a personal death: once it is over, "won" or
+            // "lost" is what everybody needs to read, dead or alive.
+            var outcome = _goal.IsWon ? "YOU WIN"
+                : _goal.IsLost ? "RAID FAILED"
+                : dead ? "YOU DIED"
+                : string.Empty;
+
             Write(result, ref _shownResult, outcome);
         }
 

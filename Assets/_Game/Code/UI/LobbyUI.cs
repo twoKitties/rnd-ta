@@ -75,6 +75,10 @@ namespace _Game.Code.UI
                  "seconds reads as a bug.")]
         [SerializeField] private GameObject _connectingIndicator;
 
+        [Tooltip("Shows the host their own address so they can read it out. Only they " +
+                 "have one worth showing — a client already knows what it typed.")]
+        [SerializeField] private Text _hostAddressLabel;
+
         [Header("Popup")]
         [SerializeField] private GameObject _popup;
         [SerializeField] private Text _popupText;
@@ -417,6 +421,16 @@ namespace _Game.Code.UI
             }
 
             _rows.Clear();
+
+            var hosting = RaidSession.Active != null && RaidSession.Active.IsHost;
+
+            if (_hostAddressLabel != null)
+            {
+                // Only while hosting, and read fresh rather than cached: the address can
+                // change under the game if the machine reconnects to the network.
+                _hostAddressLabel.text = hosting ? $"Ваш адрес: {RaidSession.Active.LocalEndpoint}" : string.Empty;
+                _hostAddressLabel.gameObject.SetActive(hosting);
+            }
 
             if (_startButton != null)
             {

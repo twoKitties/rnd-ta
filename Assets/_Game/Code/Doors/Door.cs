@@ -1,7 +1,6 @@
+using System.Collections.Generic;
+using FishNet;
 using _Game.Code.Noise;
-using FishNet.Connection;
-using FishNet.Object;
-using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 namespace _Game.Code.Doors
@@ -14,8 +13,17 @@ namespace _Game.Code.Doors
     /// HouseOneFloor.prefab), because the pack authors those with the pivot on the
     /// hinge: the leaf occupies local +X from the pivot, so a local Y rotation is
     /// the whole mechanic and no extra rig is needed.
+    ///
+    /// A plain MonoBehaviour on purpose, and it must stay one. It was a
+    /// NetworkBehaviour until 2026-08-05: that made every leaf a **scene**
+    /// NetworkObject, FishNet auto-added a ninth to the root of HouseOneFloor, and a
+    /// scene NetworkObject deactivates its own GameObject when no NetworkManager is
+    /// running (NetworkObject.cs, TryStartDeactivation) — so pressing Play straight
+    /// into Level switched the whole house off and the player fell through the floor.
+    /// The replicated half now lives on <see cref="DoorState"/>, a spawned object,
+    /// which is the pattern RaidState and LobbyRoster already use.
     /// </summary>
-    public class Door : NetworkBehaviour
+    public class Door : MonoBehaviour
     {
         [Header("Swing (MECHANICS.md section 2)")]
         [SerializeField] private float openAngle = 90f;
@@ -31,10 +39,15 @@ namespace _Game.Code.Doors
                  "a door being opened across the house, not a second reach rule.")]
         [SerializeField] private float serverReach = 3f;
 
-        // The one piece of this leaf that travels. Every peer applies it, so a door
-        // opened by one player is open for everybody — and, just as importantly, for
-        // the pets' pathing, which reads IsOpen (MECHANICS.md 4.6).
-        private readonly SyncVar<float> _swing = new SyncVar<float>();
+        private static readonly List<Door> Leaves = new List<Door>();
+
+        /// <summary>
+        /// Every leaf currently in the scene, in no particular order — the doors are
+        /// scene objects and cannot be listed by LevelBootstrapper the way spawned
+        /// actors are (MECHANICS.md 7.6). <see cref="DoorState"/> is the only reader,
+        /// and it sorts this into an order every machine agrees on.
+        /// </summary>
+        public static IReadOnlyList<Door> All => Leaves;
 
         /// <summary>
         /// True once the leaf has been asked to open. The pets' AI (block 4) reads
@@ -42,6 +55,9 @@ namespace _Game.Code.Doors
         /// this flag stops an agent from walking through a shut door.
         /// </summary>
         public bool IsOpen { get; private set; }
+
+        /// <summary>How far away a request for this leaf is still believed, world m.</summary>
+        public float ServerReach => serverReach;
 
         // The leaf's closed pose is local Y = 0 for all eight doors in the house —
         // measured 2026-08-03, at zero every leaf sits flush in its frame. The angle
@@ -53,72 +69,54 @@ namespace _Game.Code.Doors
         /// <summary>
         /// Open the leaf away from <paramref name="actor"/>, or shut it if it is
         /// already open. Actor-agnostic on purpose: the player reaches it through
-        /// PlayerInteractor, Old Man will call it from his AI in block 5, and the
-        /// animals never call it at all — that is the whole "animals cannot open
-        /// doors" rule. Under MECHANICS.md 7.4 the caller is the one making a
-        /// request; this method is what the host will run once netcode lands.
+        /// PlayerInteractor, Old Man through his AI, and the animals never call it at
+        /// all — that is the whole "animals cannot open doors" rule. Under
+        /// MECHANICS.md 7.4 the caller is the one making a request; who decides is
+        /// <see cref="DoorState"/> when there is a network, and this leaf itself when
+        /// there is not.
         /// </summary>
         public void Use(Transform actor)
         {
+            var state = DoorState.Current;
+            if (state != null)
+            {
+                state.Use(this, actor);
+                return;
+            }
+
+            // Networked, but the state object has not spawned yet — the level is still
+            // being laid out. Dropped rather than applied: a leaf swung locally here
+            // would never be corrected, because the authority does not know it moved.
+            if (IsNetworked)
+            {
+                return;
+            }
+
             // No networking at all — the level opened on its own. We are our own
             // authority, and this is the whole of it.
-            if (!IsSpawned)
-            {
-                EmitNoise(actor);
-                ApplySwing(SwingFor(actor));
-                return;
-            }
-
-            if (IsServerInitialized)
-            {
-                ServerUse(actor);
-                return;
-            }
-
-            // A client only asks. It does not send where it is standing either — the
-            // host works that out from the avatar this connection owns, so the side the
-            // leaf swings to cannot be argued about (MECHANICS.md 7.4).
-            RequestUse();
-        }
-
-        [ServerRpc(RequireOwnership = false)]
-        private void RequestUse(NetworkConnection sender = null)
-        {
-            if (sender == null || sender.FirstObject == null)
-            {
-                return;
-            }
-
-            var actor = sender.FirstObject.transform;
-
-            // The host re-runs the rule it would have run for itself, including the
-            // reach check the asking client already did — a request is not a fact.
-            if (Vector3.Distance(actor.position, transform.position) > serverReach)
-            {
-                return;
-            }
-
-            ServerUse(actor);
-        }
-
-        // The decision, taken once, on the machine that owns the rules.
-        private void ServerUse(Transform actor)
-        {
-            // Emitted here rather than on the asking client: Old Man listens on the
-            // server, and noise made on somebody else's machine is noise he never
-            // hears. The noise still belongs to the actor, not to the leaf
-            // (MECHANICS.md 7.5) — it is the actor's copy on this machine that emits.
             EmitNoise(actor);
-
-            // The state change travels as one float and every peer applies it below.
-            _swing.Value = SwingFor(actor);
+            ApplySwing(SwingFor(actor));
         }
 
-        private void EmitNoise(Transform actor)
+        private static bool IsNetworked =>
+            InstanceFinder.NetworkManager != null &&
+            (InstanceFinder.IsClientStarted || InstanceFinder.IsServerStarted);
+
+        /// <summary>
+        /// The noise using this leaf makes. Emitted where the decision is taken — Old
+        /// Man listens on the server, and noise made on somebody else's machine is
+        /// noise he never hears. It still belongs to the actor, not to the leaf
+        /// (MECHANICS.md 7.5), so it is the actor's own emitter that makes it and Old
+        /// Man walks to where the player stood rather than to where the leaf hangs.
+        /// An actor with no emitter (Old Man himself) opens doors quietly.
+        /// </summary>
+        public void EmitNoise(Transform actor)
         {
-            // The side effect is the right one — Old Man walks to where the player
-            // stood, not to where the leaf hangs. An actor with no emitter (Old Man
-            // himself) opens doors quietly.
+            if (actor == null)
+            {
+                return;
+            }
+
             var noise = actor.GetComponent<NoiseEmitter>();
             if (noise != null)
             {
@@ -155,8 +153,8 @@ namespace _Game.Code.Doors
 
         /// <summary>
         /// The state change: the only thing that writes <see cref="IsOpen"/>, and the
-        /// only thing a netcode pass has to carry — one float. Every peer runs it, so
-        /// a leaf opened by one player is open for the pets' pathing on every machine.
+        /// only thing that travels — one float. Every peer runs it, so a leaf opened
+        /// by one player is open for the pets' pathing on every machine.
         /// </summary>
         public void ApplySwing(float targetAngle)
         {
@@ -166,19 +164,12 @@ namespace _Game.Code.Doors
 
         private void Awake()
         {
-            // Driven from the replicated value rather than from whoever asked, so the
-            // server's own copy and every client's go through exactly one line.
-            _swing.OnChange += OnSwingChanged;
+            Leaves.Add(this);
         }
 
         private void OnDestroy()
         {
-            _swing.OnChange -= OnSwingChanged;
-        }
-
-        private void OnSwingChanged(float previous, float next, bool asServer)
-        {
-            ApplySwing(next);
+            Leaves.Remove(this);
         }
 
         // Update, not FixedUpdate: the leaf is a plain collider with no Rigidbody, so

@@ -441,12 +441,30 @@ namespace _Game.Code
                 var instance = Instantiate(prefab, point.position, point.rotation);
                 instance.name = prefab.name;
 
-                // Owned by nobody: the animals and Old Man belong to the rules, not to
-                // a player. Spawning is still the server's, so every peer gets the same
-                // three animals rather than three of its own.
-                if (IsNetworked && instance.GetComponent<NetworkObject>() != null)
+                var nob = instance.GetComponent<NetworkObject>();
+                if (nob != null)
                 {
-                    InstanceFinder.ServerManager.Spawn(instance);
+                    if (IsNetworked)
+                    {
+                        // Owned by nobody: the animals and Old Man belong to the rules,
+                        // not to a player. Spawning is still the server's, so every peer
+                        // gets the same three animals rather than three of its own. The
+                        // avatars are the exception and are spawned in SpawnPlayers,
+                        // which owns them to a connection.
+                        InstanceFinder.ServerManager.Spawn(instance);
+                    }
+                    else
+                    {
+                        // Pressing Play straight into this scene, with no NetworkManager
+                        // anywhere. FishNet switches an unspawned NetworkObject's
+                        // GameObject **off** in its own Start (NetworkObject.cs,
+                        // TryStartDeactivation) — measured 2026-08-05, that took the
+                        // avatar, both animals and Old Man with it and left an empty
+                        // house. This flag is the supported way out: it is read first in
+                        // that method, and setting it here is in time because Instantiate
+                        // runs Awake but not Start.
+                        nob.SetIsNetworked(false);
+                    }
                 }
 
                 spawned.Add(instance);

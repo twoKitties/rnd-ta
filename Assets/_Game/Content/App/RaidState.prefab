@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9111309050317498246}
   - component: {fileID: 8281743243317466243}
   - component: {fileID: 1879950753132112940}
+  - component: {fileID: 2512202078275834293}
   m_Layer: 0
   m_Name: RaidState
   m_TagString: Untagged
@@ -105,3 +106,18 @@ MonoBehaviour:
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
   _initializedTimestamp: 0
+--- !u!114 &2512202078275834293
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 741355934569107631}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ca9ce3a0f026a34fa7d6ed732714652, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Doors.DoorState
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 1879950753132112940}
+  _networkObjectCache: {fileID: 0}

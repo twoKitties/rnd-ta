@@ -194,7 +194,11 @@ namespace _Game.Code.Doors
             var count = Mathf.Min(_doors.Length, _swings.Count);
             for (var i = 0; i < count; i++)
             {
-                _doors[i].ApplySwing(_swings[i]);
+                // Silently: this is the whole house being described at once — on a join,
+                // or after a Complete operation — not eight hinges turning. A creak here
+                // would greet every late joiner with a volley from doors somebody opened
+                // minutes ago.
+                _doors[i].ApplySwing(_swings[i], silent: true);
             }
         }
 

@@ -27,10 +27,23 @@ namespace _Game.Code.Level
         /// </summary>
         public bool Contains(Vector3 worldPosition)
         {
+            return Contains(worldPosition, 0f);
+        }
+
+        /// <summary>
+        /// The same test with an allowance on the radius. Zero is the rule itself and
+        /// is what the player is shown; anything above it is the authority judging a
+        /// position it only knows late — a client-authoritative avatar reaches the
+        /// server interpolated and behind, and the beam's edge is exactly where the
+        /// players stand.
+        /// </summary>
+        public bool Contains(Vector3 worldPosition, float extraRadius)
+        {
             var here = transform.position;
             var dx = worldPosition.x - here.x;
             var dz = worldPosition.z - here.z;
-            return dx * dx + dz * dz <= radius * radius;
+            var reach = radius + extraRadius;
+            return dx * dx + dz * dz <= reach * reach;
         }
 
         private void OnDrawGizmos()

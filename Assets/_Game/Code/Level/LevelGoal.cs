@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using _Game.Code.AI;
+using _Game.Code.App;
 using _Game.Code.Pets;
 using _Game.Code.Player;
 using FishNet.Object;
@@ -17,6 +18,16 @@ namespace _Game.Code.Level
     public class LevelGoal : MonoBehaviour
     {
         [SerializeField] private BeamZone beamZone;
+
+        [Tooltip("Extra beam radius the authority allows when judging a *remote* " +
+                 "avatar's position, world m. A client-authoritative avatar reaches the " +
+                 "server late and smoothed, while the beam's radius is 1 and all four " +
+                 "PlayerSpawn points stand at exactly 1.000 m from its axis — so a " +
+                 "delivery the client saw inside the beam is refused here, silently. " +
+                 "Same idea as Door.serverReach: a sanity bound, not a second rule. " +
+                 "Provisional until measured — log the client-claimed against the " +
+                 "server-seen distance at sprint speed (4 m/s) on two machines.")]
+        [SerializeField] private float serverBeamSlack = 0.5f;
 
         /// <summary>
         /// The running level's goal. A static for the same reason LevelBootstrapper.Current
@@ -63,8 +74,13 @@ namespace _Game.Code.Level
         // until FishNet says so.
         private bool _totalPushed;
 
-        // Who decides. Off the network we do; on it, the server.
-        private static bool IsAuthority => Shared == null || Shared.IsAuthority;
+        // Who decides is a property of the *process*, not of whether the replicated
+        // state object has arrived. It used to be `Shared == null || Shared.IsAuthority`,
+        // and avatars spawn before RaidState does: in that window a client answered
+        // yes, released the animal locally, incremented its own counter and the server
+        // never heard — one delivery swallowed per raid, silently (netcode audit
+        // 2026-08-05).
+        private static bool IsAuthority => Authority.DecidesHere;
 
         // The same view of a player the brains get. It already answers the only two
         // questions the outcome asks — where are they, and are they still alive — and
@@ -108,8 +124,34 @@ namespace _Game.Code.Level
         /// </summary>
         public bool CountsAsDelivery(PlayerHands hands)
         {
+            return CountsAsDelivery(hands, 0f);
+        }
+
+        /// <summary>
+        /// The same rule with an allowance on the beam's radius. Zero is the rule as
+        /// the player is shown it, and is what the overload above — the one anything
+        /// outside this class asks — keeps meaning; the authority passes
+        /// <see cref="serverBeamSlack"/> when the hands it is judging are somebody
+        /// else's.
+        /// </summary>
+        public bool CountsAsDelivery(PlayerHands hands, float slack)
+        {
             return hands != null && !hands.IsEmpty && beamZone != null &&
-                   beamZone.Contains(hands.transform.position);
+                   beamZone.Contains(hands.transform.position, slack);
+        }
+
+        /// <summary>
+        /// How much beam to allow these hands. Only a *remote* avatar's position is
+        /// late — ours is where we put it this frame, and a level played with no
+        /// networking has no lag to compensate. So the slack pays for the wire, not
+        /// for generosity, and an owner never gets it.
+        /// </summary>
+        private float SlackFor(PlayerHands hands)
+        {
+            // Asked through the NetworkObject rather than through NetworkBehaviour's
+            // own IsSpawned, which throws when the behaviour was never initialised.
+            var nob = hands.GetComponent<NetworkObject>();
+            return nob != null && nob.IsSpawned && !nob.IsOwner ? serverBeamSlack : 0f;
         }
 
         /// <summary>
@@ -143,8 +185,10 @@ namespace _Game.Code.Level
             }
 
             // Asked before the animal leaves the hands, since the rule is about the
-            // carrier and Release empties them.
-            var handedOver = CountsAsDelivery(hands);
+            // carrier and Release empties them. With the allowance these particular
+            // hands have earned: a request that travelled here is judged against a
+            // position that travelled with it.
+            var handedOver = CountsAsDelivery(hands, SlackFor(hands));
             var pet = hands.Carried;
 
             pet.Release();
@@ -220,7 +264,14 @@ namespace _Game.Code.Level
                 }
 
                 living++;
-                if (beamZone != null && beamZone.Contains(player.Transform.position))
+
+                // Everyone gets the allowance on a networked raid, the host's own
+                // avatar included. A deliberate simplification: only a remote avatar's
+                // position is actually late, but this runs every frame for every
+                // player and an ownership lookup per player per frame is not worth
+                // the half metre it would save.
+                if (beamZone != null &&
+                    beamZone.Contains(player.Transform.position, Shared == null ? 0f : serverBeamSlack))
                 {
                     livingInsideBeam++;
                 }

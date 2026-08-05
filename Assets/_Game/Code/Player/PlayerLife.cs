@@ -1,6 +1,6 @@
-using FishNet;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using _Game.Code.App;
 using _Game.Code.Level;
 using UnityEngine;
 
@@ -44,13 +44,14 @@ namespace _Game.Code.Player
         private LevelGoal _goal;
 
         /// <summary>
-        /// Where death is decided: the server, or a process with no networking at all.
-        /// Asked of the process rather than of this object's spawn state, because it is
-        /// also the question during despawn — a player leaving is killed on the way out
-        /// (MECHANICS.md 3.7), and by then the object's own answer is already changing.
+        /// Where death is decided. The formula lives in <see cref="Authority"/>, which
+        /// LevelGoal shares: it is asked of the process rather than of this object's
+        /// spawn state, because it is also the question during despawn — a player
+        /// leaving is killed on the way out (MECHANICS.md 3.7), and by then the
+        /// object's own answer is already changing. Kept as a named property here
+        /// because every call site below reads better for it.
         /// </summary>
-        private static bool DecidesHere =>
-            InstanceFinder.NetworkManager == null || !InstanceFinder.IsClientStarted || InstanceFinder.IsServerStarted;
+        private static bool DecidesHere => Authority.DecidesHere;
 
         private void Awake()
         {

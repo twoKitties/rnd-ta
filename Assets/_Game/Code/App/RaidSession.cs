@@ -6,6 +6,7 @@ using FishNet;
 using FishNet.Connection;
 using FishNet.Managing.Scened;
 using FishNet.Transporting;
+using _Game.Code.UI;
 using UnityEngine;
 
 // Both FishNet and Unity have a SceneManager and this file uses both. The alias keeps
@@ -399,6 +400,11 @@ namespace _Game.Code.App
         public void LocalAvatarSpawned()
         {
             _avatarLostAt = 0f;
+
+            if (LoadingScreen.Active != null)
+            {
+                LoadingScreen.Active.RaidReady();
+            }
         }
 
         /// <summary>
@@ -437,7 +443,7 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = true;
-            LoadForEveryone(levelScene);
+            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
         }
 
         /// <summary>
@@ -466,8 +472,10 @@ namespace _Game.Code.App
             // IsRaidRunning deliberately stays true across both loads. It is the door on
             // late join, and dropping it here would open that door for the moment the
             // lobby is on screen.
-            LoadForEveryone(lobbyScene);
-            LoadForEveryone(levelScene);
+            // Intermediate lobby stamped RaidReady too, so the screen does not lift on
+            // the way through.
+            LoadForEveryone(lobbyScene, LoadingScreen.Wait.RaidReady);
+            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
         }
 
         /// <summary>Everybody back to the lobby, with the session still up.</summary>
@@ -479,17 +487,26 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = false;
-            LoadForEveryone(lobbyScene);
+            LoadForEveryone(lobbyScene, LoadingScreen.Wait.MainMenu);
         }
 
         // Through FishNet's own scene manager rather than Unity's: it is what carries
         // the load to every client and what keeps spawned objects attached to the right
         // scene. ReplaceOption.All because a raid is not additive — the old scene must
         // be gone, or two levels' worth of actors exist at once.
-        private void LoadForEveryone(string sceneName)
+        //
+        // destination is where the whole transition ends, not this load. Restart's Lobby
+        // is indistinguishable on the wire from ReturnToLobby's, and the server does not
+        // wait for clients between queued operations — without the stamp a client sits
+        // in the main menu for the whole of the server's Level load.
+        private void LoadForEveryone(string sceneName, LoadingScreen.Wait destination)
         {
             var data = new SceneLoadData(sceneName);
             data.ReplaceScenes = ReplaceOption.All;
+
+            // ClientParams is the half of LoadParams that travels; ServerParams is [NonSerialized].
+            data.Params.ClientParams = new[] { (byte)destination };
+
             InstanceFinder.SceneManager.LoadGlobalScenes(data);
         }
 
@@ -499,6 +516,12 @@ namespace _Game.Code.App
         {
             _inSession = false;
             _avatarLostAt = 0f;
+
+            // Also re-targets a screen still waiting for a raid that will never start.
+            if (LoadingScreen.Active != null)
+            {
+                LoadingScreen.Active.Show(LoadingScreen.Wait.MainMenu);
+            }
 
             if (!string.IsNullOrEmpty(lobbyScene) && UnityScenes.GetActiveScene().name != lobbyScene)
             {

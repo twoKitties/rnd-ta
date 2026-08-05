@@ -90,8 +90,17 @@ namespace _Game.Code.UI
         private LobbyRoster _roster;
         private RaidSession _session;
 
+        /// <summary>
+        /// The lobby while it is on screen. Read by <see cref="LoadingScreen"/> as "is
+        /// the main menu up" — SceneManager.sceneLoaded does not answer that, it never
+        /// fires for a scene FishNet skips as already loaded.
+        /// </summary>
+        public static LobbyUI Current { get; private set; }
+
         private void Awake()
         {
+            Current = this;
+
             _playButton.onClick.AddListener(OpenLobby);
             _settingsButton.onClick.AddListener(OpenSettings);
             _exitButton.onClick.AddListener(Exit);
@@ -192,6 +201,11 @@ namespace _Game.Code.UI
 
             Unsubscribe();
             UnsubscribeSession();
+
+            if (Current == this)
+            {
+                Current = null;
+            }
         }
 
         // The roster is spawned by the host over the network, so it does not exist when

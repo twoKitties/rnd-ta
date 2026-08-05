@@ -1,3 +1,4 @@
+using _Game.Code.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -25,11 +26,19 @@ namespace _Game.Code.App
                  "empty to run with no networking at all — single player still works.")]
         [SerializeField] private GameObject sessionPrefab;
 
+        [Tooltip("Covers every transition for the whole launch. Kept alive across scenes " +
+                 "because it is shown in one and hidden after another has loaded.")]
+        [SerializeField] private GameObject loadingScreenPrefab;
+
         private static bool _sessionExists;
 
         private void Start()
         {
             EnsureSession();
+
+            // After the session: Instantiate runs OnEnable synchronously, and the screen
+            // subscribes to the network's scene manager there.
+            EnsureLoadingScreen();
 
             // Start, not Awake: loading a scene out of Awake runs while this scene is
             // still being built.
@@ -58,6 +67,24 @@ namespace _Game.Code.App
             session.name = sessionPrefab.name;
             DontDestroyOnLoad(session);
             _sessionExists = true;
+        }
+
+        /// <summary>
+        /// Creates the loading screen if this launch has not. It shows itself on the way
+        /// up. Its own object rather than part of the session prefab, which is optional.
+        /// </summary>
+        private void EnsureLoadingScreen()
+        {
+            // Asked of the object, not a static bool: needs no reset between Play
+            // sessions. Unity object, so `== null` rather than `?.`.
+            if (LoadingScreen.Active != null || loadingScreenPrefab == null)
+            {
+                return;
+            }
+
+            var screen = Instantiate(loadingScreenPrefab);
+            screen.name = loadingScreenPrefab.name;
+            DontDestroyOnLoad(screen);
         }
 
         // Domain reload is disabled in some project settings, and then a static would

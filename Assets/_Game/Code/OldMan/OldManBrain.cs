@@ -82,6 +82,11 @@ namespace _Game.Code.OldMan
         [Tooltip("Between seeing a player and firing. The window the player can still escape in.")]
         [SerializeField] private float aimDelay = 0.4f;
 
+        [Tooltip("Shortest gap between two shots, s — he is reloading a shotgun. Without " +
+                 "it the only gap is the aim delay, so a second player in the room dies " +
+                 "0.4 s after the first (MECHANICS.md section 2).")]
+        [SerializeField] private float shotCooldown = 2f;
+
         [Header("Doors (MECHANICS.md 5.5)")]
         [Tooltip("How close he must be to a leaf to pull it. Same reach the player has.")]
         [SerializeField] private float doorReach = 1.5f;
@@ -131,6 +136,10 @@ namespace _Game.Code.OldMan
         private int _patrolIndex;
         private float _waitLeft;
         private float _aimLeft;
+
+        // When the gun is loaded again. Absolute time rather than a countdown, so it
+        // survives him leaving Aim and coming back — which he does after every shot.
+        private float _nextShotAt;
         private float _repathAt;
         private float _doorWaitUntil;
 
@@ -250,11 +259,23 @@ namespace _Game.Code.OldMan
                 return;
             }
 
+            // Reloading. He keeps the target lined up — Halt and FaceTowards above run
+            // every frame, and Think keeps refreshing _targetSpot while the player is
+            // visible — so this is a man with you in his sights and an empty barrel, not
+            // a man who has forgotten you. Break his line of sight during it and the
+            // branch above cancels the shot exactly as it does during the aim delay.
+            if (Time.time < _nextShotAt)
+            {
+                return;
+            }
+
             Shoot(seen);
         }
 
         private void Shoot(SensedPlayer target)
         {
+            _nextShotAt = Time.time + shotCooldown;
+
             target.Kill();
 
             // Unity object: a destroyed one compares == null but is not a real null.

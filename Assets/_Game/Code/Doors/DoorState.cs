@@ -26,6 +26,13 @@ namespace _Game.Code.Doors
     /// </summary>
     public class DoorState : NetworkBehaviour
     {
+        [Tooltip("How many door leaves the house is expected to register — purely a " +
+                 "check, because CollectDoors snapshots Door.All and a leaf whose Awake " +
+                 "has not run yet is silently missing from it. That leaf then just never " +
+                 "opens, and if the shortfall happens on the server every machine " +
+                 "inherits it.")]
+        [SerializeField] private int expectedLeaves = 8;
+
         // One entry per leaf, in the order of _doors below. A SyncList rather than a
         // SyncVar per leaf because the leaves are found at runtime: they live in the
         // scene, so no serialized field can name them.
@@ -75,6 +82,18 @@ namespace _Game.Code.Doors
 
             CollectDoors();
             Current = this;
+
+            // The indices only mean anything while both ends count the same leaves. The
+            // guard on Count is not paranoia: on a listen host OnStartServer has already
+            // sized the list, and on a pure client the initial SyncList payload arrives
+            // before this callback — so a count of zero here means something else
+            // entirely, and ApplyAll's Mathf.Min already tolerates it.
+            if (_swings.Count > 0 && _doors.Length != _swings.Count)
+            {
+                Debug.LogError($"DoorState: {_doors.Length} door leaves here but the server sent " +
+                               $"{_swings.Count} swings. The two snapshots disagree about the house, " +
+                               "so an index no longer names the same door on both machines.");
+            }
 
             // A late joiner walks into a house whose doors are already half open. The
             // full collection arrives with the spawn message, so this is the moment it
@@ -240,6 +259,19 @@ namespace _Game.Code.Doors
 
             doors.Sort((a, b) => string.CompareOrdinal(keys[a], keys[b]));
             _doors = doors.ToArray();
+
+            // Door.All is filled in each leaf's Awake and Unity does not promise Awake
+            // order between root objects, so this can run before every leaf has woken.
+            // Nothing fails loudly when it does: a missing leaf is simply not in the
+            // snapshot and never opens, and on the server the SyncList is sized short,
+            // so ApplyAll's Mathf.Min leaves the tail shut on every machine for the rest
+            // of the raid. Reads as "this door is broken" unless it is said here.
+            if (_doors.Length != expectedLeaves)
+            {
+                Debug.LogError($"DoorState: found {_doors.Length} door leaves but expected " +
+                               $"{expectedLeaves}. Doors missing from the snapshot never open, " +
+                               "and on the server the swing list is sized short for everyone.");
+            }
         }
 
         private static string SortKey(Transform leaf)

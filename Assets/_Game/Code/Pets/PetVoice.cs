@@ -78,6 +78,16 @@ namespace _Game.Code.Pets
             Say(carried);
         }
 
+        /// <summary>
+        /// Would a call be made right now, or would the cooldown — or a missing clip —
+        /// swallow it. Asked before the call travels: <see cref="Pet.AnnounceNoticed"/>
+        /// fires every frame its condition holds, and the cooldown lives at the far end,
+        /// so without this the refusal costs a reliable packet to every observer for
+        /// nothing (audit 2026-08-05, ~60 a second per animal per client, and every one
+        /// of them wasted while the clips are unassigned).
+        /// </summary>
+        public bool WillNotice => noticed != null && Time.time >= _quietUntil;
+
         private void Say(AudioClip clip)
         {
             if (clip == null || Time.time < _quietUntil)

@@ -175,7 +175,6 @@ namespace _Game.Code.Pets
         private Pet _pet;
         private NavMeshAgent _agent;
         private Animator _animator;
-        private PetVoice _voice;
         private NoiseEmitter _ownNoise;
 
         private IReadOnlyList<SensedPlayer> _players;
@@ -214,7 +213,6 @@ namespace _Game.Code.Pets
             _pet = GetComponent<Pet>();
             _agent = GetComponent<NavMeshAgent>();
             _animator = GetComponent<Animator>();
-            _voice = GetComponent<PetVoice>();
             _ownNoise = GetComponent<NoiseEmitter>();
             _path = new NavMeshPath();
         }
@@ -271,9 +269,11 @@ namespace _Game.Code.Pets
             // in (4.4). PetVoice paces the repeats with its own cooldown, and an animal
             // with no clip in the slot stays completely silent.
             var charged = threat != null && IsChargedBy(threat);
-            if (charged && _voice != null)
+            // Through Pet, not straight to PetVoice: this brain runs on the server only,
+            // and a bark made here reaches nobody else's speakers (see AnnounceNoticed).
+            if (charged && _pet != null)
             {
-                _voice.Noticed();
+                _pet.AnnounceNoticed();
             }
 
             CheckDoorAhead();
@@ -476,9 +476,10 @@ namespace _Game.Code.Pets
             // Barking while it comes. The bark is noise like a step, so this is the
             // price of walking rather than sneaking (4.4); PetVoice's own cooldown
             // paces it, and an empty clip slot keeps it silent.
-            if (_voice != null)
+            // Same reason as the other call site: the bark has to leave this machine.
+            if (_pet != null)
             {
-                _voice.Noticed();
+                _pet.AnnounceNoticed();
             }
 
             var here = player.Transform.position;

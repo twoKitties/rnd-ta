@@ -806,6 +806,7 @@ GameObject:
   - component: {fileID: 4830120295788075851}
   - component: {fileID: 2843116167120039534}
   - component: {fileID: 5128303827824018720}
+  - component: {fileID: 8363166653145031201}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1213,6 +1214,22 @@ MonoBehaviour:
   suspendWhileOpen:
   - {fileID: 8720415816767902971}
   - {fileID: 3828167182167701776}
+--- !u!114 &8363166653145031201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2239553874488288769}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8e157a0bed305641abfad9f1edcbd53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Player.PlayerMotion
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 712437915036207868}
+  _networkObjectCache: {fileID: 0}
+  speedEpsilon: 0.05
 --- !u!1 &2255835499259793941
 GameObject:
   m_ObjectHideFlags: 0

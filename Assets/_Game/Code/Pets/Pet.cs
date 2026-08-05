@@ -300,6 +300,57 @@ namespace _Game.Code.Pets
             }
         }
 
+        /// <summary>
+        /// The animal has just noticed somebody and says so (MECHANICS.md 4.4). Routed
+        /// through here rather than straight to PetVoice because the brain that decides
+        /// it runs on the server alone (ServerSimulated) — a bark triggered there is a
+        /// bark only the host hears, and a Dog barking at an intruder is a warning to
+        /// the other three players, not decoration.
+        ///
+        /// The same reasoning as <c>Caught</c> and <c>WhileCarried</c>, which already
+        /// reach every peer because <see cref="ApplyCarry"/> and <see cref="LateUpdate"/>
+        /// run everywhere. This is the one that had nothing carrying it.
+        /// </summary>
+        public void AnnounceNoticed()
+        {
+            // Asked here rather than discovered at the far end: the brain calls this
+            // every frame its condition holds, and the cooldown that refuses most of
+            // those calls lives inside PetVoice — so without this check the refusal
+            // would still cost a reliable packet to every observer.
+            if (_voice == null || !_voice.WillNotice)
+            {
+                return;
+            }
+
+            if (!IsReplicated)
+            {
+                Speak();
+                return;
+            }
+
+            if (IsAuthority)
+            {
+                ObserversNoticed();
+            }
+        }
+
+        // RunLocally so the authority takes the same path as everybody else and there
+        // is one place the sound is made.
+        [ObserversRpc(RunLocally = true)]
+        private void ObserversNoticed()
+        {
+            Speak();
+        }
+
+        private void Speak()
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (_voice != null)
+            {
+                _voice.Noticed();
+            }
+        }
+
         /// <summary>Puts the animal back on the floor and frees both slots.</summary>
         public void Release()
         {

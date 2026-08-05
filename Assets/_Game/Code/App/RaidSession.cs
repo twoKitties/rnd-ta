@@ -265,7 +265,7 @@ namespace _Game.Code.App
             {
                 // Almost always the port already being in use — a second copy of the
                 // game left running, which is exactly what happens while testing.
-                Fail($"Не удалось занять порт {port}");
+                Fail($"Could not take port {port}");
                 return false;
             }
 
@@ -284,7 +284,7 @@ namespace _Game.Code.App
                 return true;
             }
 
-            Fail("Не удалось подключиться к собственному хосту");
+            Fail("Could not connect to host");
             return false;
         }
 
@@ -300,7 +300,7 @@ namespace _Game.Code.App
             ushort chosenPort;
             if (!TryParseEndpoint(endpoint, out address, out chosenPort))
             {
-                Fail("Адрес не разобран");
+                Fail("Address not recognized");
                 return false;
             }
 
@@ -312,7 +312,7 @@ namespace _Game.Code.App
                 return true;
             }
 
-            Fail("Соединение не найдено");
+            Fail("Connection not found");
             return false;
         }
 
@@ -568,7 +568,7 @@ namespace _Game.Code.App
                 // A failed attempt leaves the server half of a would-be host listening,
                 // and a stale listener makes the next Host fail on a busy port.
                 StopServerIfStarted();
-                Fail("Соединение не найдено");
+                Fail("Connection not found");
                 return;
             }
 
@@ -577,7 +577,7 @@ namespace _Game.Code.App
             // gets no popup and a player who was dropped does.
             if (_inSession)
             {
-                _notice = "Соединение с хостом потеряно";
+                _notice = "Connection lost";
             }
 
             IsRaidRunning = false;
@@ -596,7 +596,7 @@ namespace _Game.Code.App
             if (_inSession && !IsConnecting && !InstanceFinder.IsClientStarted && !InstanceFinder.IsServerStarted)
             {
                 IsRaidRunning = false;
-                _notice = "Соединение с хостом потеряно";
+                _notice = "Connection lost";
                 GoToLobbyAlone();
                 return;
             }
@@ -611,7 +611,7 @@ namespace _Game.Code.App
 
                 // Set before Leave, which goes through GoToLobbyAlone and would otherwise
                 // look exactly like the player having chosen to leave.
-                _notice = "Хост завершил игру";
+                _notice = "Game ended by host";
                 Leave();
                 return;
             }
@@ -630,7 +630,7 @@ namespace _Game.Code.App
             }
 
             StopServerIfStarted();
-            Fail("Соединение не найдено");
+            Fail("Connection not found");
         }
 
         private void BeginAttempt()

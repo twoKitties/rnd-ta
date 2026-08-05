@@ -810,6 +810,8 @@ GameObject:
   - component: {fileID: 3177420557521873525}
   - component: {fileID: 8169274461671871203}
   - component: {fileID: 8597881750601158075}
+  - component: {fileID: 7599721475431835561}
+  - component: {fileID: 5461600115069761610}
   m_Layer: 0
   m_Name: Old Man
   m_TagString: Untagged
@@ -912,8 +914,7 @@ MonoBehaviour:
   doorMask:
     serializedVersion: 2
     m_Bits: 512
-  muzzleFlash: {fileID: 5071351565010985022}
-  muzzleFlashTime: 0.06
+  shotFlash: {fileID: 5461600115069761610}
 --- !u!114 &3177420557521873525
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1035,6 +1036,45 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
+--- !u!114 &7599721475431835561
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3706920364051464488}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8cac635f24954048aad3a6ff9110beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Component.Animating.NetworkAnimator
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 8169274461671871203}
+  _networkObjectCache: {fileID: 0}
+  IgnoredParameters: []
+  _animator: {fileID: 2112313865116568199}
+  _synchronizeWhenDisabled: 0
+  _smoothFloats: 1
+  _interpolation: 2
+  _clientAuthoritative: 0
+  _sendToOwner: 0
+--- !u!114 &5461600115069761610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3706920364051464488}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 636959556fdaea44a910025bec36ff3e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.OldMan.ShotFlash
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 8169274461671871203}
+  _networkObjectCache: {fileID: 0}
+  flash: {fileID: 5071351565010985022}
+  flashTime: 0.06
 --- !u!1 &3871579535469855889
 GameObject:
   m_ObjectHideFlags: 0

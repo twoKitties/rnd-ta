@@ -91,6 +91,28 @@ namespace _Game.Code.Player
         public PlayerIntent Intent { get; set; }
 
         /// <summary>
+        /// The movement half of this avatar, applied from outside. This is what a peer
+        /// that does **not** own the avatar uses: <see cref="PlayerMotion"/> carries the
+        /// owner's answer over the wire and writes it here, so that everything reading
+        /// <see cref="State"/> and <see cref="Speed"/> — the noise, the animator, both
+        /// brains through SensedPlayer — keeps reading exactly one place and none of
+        /// them has to know whose avatar this is.
+        ///
+        /// Without it those readers see the values this component's own OnDisable left
+        /// behind, which is Idle at zero: measured 2026-08-05, that made every remote
+        /// player silent to Old Man (idleNoise is 0) and motionless in everyone else's
+        /// animator, no matter how they were actually moving.
+        ///
+        /// The state change of MECHANICS.md 7.4, and the mirror of <see cref="Move"/>,
+        /// which is the same assignment made from a device.
+        /// </summary>
+        public void ApplyMotion(MoveState state, float speed)
+        {
+            State = state;
+            Speed = speed;
+        }
+
+        /// <summary>
         /// Where this avatar's eyes are: the transform <see cref="Look"/> pitches, and
         /// the one a spectator copies to look out of a teammate's head. Exposed rather
         /// than searched for by name, because the camera is a child of a prefab that

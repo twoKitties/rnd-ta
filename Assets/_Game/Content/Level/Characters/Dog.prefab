@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 225804337133082177}
   - component: {fileID: 5013373475664358944}
   - component: {fileID: 2691054627246898264}
+  - component: {fileID: 3422379798188868070}
   m_Layer: 10
   m_Name: Dog
   m_TagString: Untagged
@@ -427,6 +428,28 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
+--- !u!114 &3422379798188868070
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 202121160631726732}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8cac635f24954048aad3a6ff9110beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Component.Animating.NetworkAnimator
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 5013373475664358944}
+  _networkObjectCache: {fileID: 0}
+  IgnoredParameters: []
+  _animator: {fileID: 4301874712382505920}
+  _synchronizeWhenDisabled: 0
+  _smoothFloats: 1
+  _interpolation: 2
+  _clientAuthoritative: 0
+  _sendToOwner: 0
 --- !u!1 &424588581323309775
 GameObject:
   m_ObjectHideFlags: 0

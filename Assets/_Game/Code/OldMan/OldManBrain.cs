@@ -106,10 +106,10 @@ namespace _Game.Code.OldMan
         [SerializeField] private LayerMask doorMask;
 
         [Header("Shot")]
-        [Tooltip("Blinked when he fires. Optional — without it the shot is the log alone.")]
-        [SerializeField] private Light muzzleFlash;
-
-        [SerializeField] private float muzzleFlashTime = 0.06f;
+        [Tooltip("Shows the shot. Optional — without it the shot is the log alone. It " +
+                 "is a separate component because this brain runs on the server only, " +
+                 "and a flash lit here would be seen by nobody else.")]
+        [SerializeField] private ShotFlash shotFlash;
 
         // Hashes, not state: nothing per-actor lives here (MECHANICS.md 7.3). The two
         // bools are the whole interface of the vendor controller — it has no float
@@ -133,7 +133,6 @@ namespace _Game.Code.OldMan
         private float _aimLeft;
         private float _repathAt;
         private float _doorWaitUntil;
-        private float _flashOffAt;
 
         // Where he is going, and — while aiming or searching — where he last saw a
         // player. The two never overlap: he does not walk towards someone he can see.
@@ -156,10 +155,6 @@ namespace _Game.Code.OldMan
             _animator = GetComponent<Animator>();
             _path = new NavMeshPath();
 
-            if (muzzleFlash != null)
-            {
-                muzzleFlash.enabled = false;
-            }
         }
 
         /// <summary>
@@ -190,8 +185,6 @@ namespace _Game.Code.OldMan
 
         private void Update()
         {
-            UpdateFlash();
-
             // An agent that is not on the mesh answers every path query with an error.
             if (!_agent.enabled || !_agent.isOnNavMesh)
             {
@@ -264,10 +257,10 @@ namespace _Game.Code.OldMan
         {
             target.Kill();
 
-            if (muzzleFlash != null)
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (shotFlash != null)
             {
-                muzzleFlash.enabled = true;
-                _flashOffAt = Time.time + muzzleFlashTime;
+                shotFlash.Fire();
             }
 
             Debug.Log($"{name} fired (MECHANICS.md 5.2). No shooting animation yet: flash and log only.");
@@ -666,19 +659,6 @@ namespace _Game.Code.OldMan
             var offset = point - transform.position;
             offset.y = 0f;
             return offset.magnitude;
-        }
-
-        private void UpdateFlash()
-        {
-            if (muzzleFlash == null || !muzzleFlash.enabled)
-            {
-                return;
-            }
-
-            if (Time.time >= _flashOffAt)
-            {
-                muzzleFlash.enabled = false;
-            }
         }
 
         private void DriveAnimator()

@@ -311,6 +311,7 @@ GameObject:
   - component: {fileID: 2822732122429365216}
   - component: {fileID: 106187260341657772}
   - component: {fileID: 7629324085092874386}
+  - component: {fileID: 1254703448355250885}
   m_Layer: 10
   m_Name: Parrot
   m_TagString: Untagged
@@ -718,6 +719,28 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
+--- !u!114 &1254703448355250885
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3194756889528111688}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8cac635f24954048aad3a6ff9110beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FishNet.Runtime::FishNet.Component.Animating.NetworkAnimator
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 106187260341657772}
+  _networkObjectCache: {fileID: 0}
+  IgnoredParameters: []
+  _animator: {fileID: 6979784439368316734}
+  _synchronizeWhenDisabled: 0
+  _smoothFloats: 1
+  _interpolation: 2
+  _clientAuthoritative: 0
+  _sendToOwner: 0
 --- !u!1 &3523814903804832409
 GameObject:
   m_ObjectHideFlags: 0

@@ -31,6 +31,11 @@ namespace _Game.Code.AI
             _life = avatar.GetComponent<PlayerLife>();
             _body = avatar.GetComponent<CharacterController>();
             Transform = avatar.transform;
+
+            // So the first difference is taken against where they actually are rather
+            // than against the origin, which would read as a sprint from across the map.
+            _lastPosition = Transform.position;
+            _lastSampledAt = Time.time;
         }
 
         public Transform Transform { get; }
@@ -59,25 +64,76 @@ namespace _Game.Code.AI
         public bool IsRunning => State == MoveState.Sprint;
 
         /// <summary>
-        /// Where they are actually going, world m/s, flattened. Read off the
-        /// CharacterController rather than differenced between frames, so it is the
-        /// same vector the controller moved them by; the vertical part is dropped
-        /// because falling is not running at anybody.
+        /// Where they are actually going, world m/s, flattened — the vertical part is
+        /// dropped because falling is not running at anybody.
+        ///
+        /// Differenced between frames rather than read off the CharacterController, and
+        /// that is a correctness fix, not a preference (audit 2026-08-05).
+        /// <c>CharacterController.velocity</c> is the distance its own <c>Move</c>
+        /// covered, so it is zero for any avatar this machine does not drive: on the
+        /// server every client's controller is switched off and the transform is moved
+        /// by NetworkTransform instead. The charge rule of MECHANICS.md 4.1 and 4.4
+        /// reads this, so it worked for the host and for nobody else — three players out
+        /// of four could run animals down for free. A transform difference is one source
+        /// for every avatar and costs the network nothing.
+        ///
+        /// Sampled once per frame however many brains ask, and a gap longer than
+        /// <see cref="MaxSampleGap"/> is thrown away rather than turned into a false
+        /// sprint — that gap means a scene load or a spawn, not a player moving.
         /// </summary>
         public Vector3 Velocity
         {
-            // Unity object: a destroyed one compares == null but is not a real null.
             get
             {
-                if (_body == null)
-                {
-                    return Vector3.zero;
-                }
-
-                var velocity = _body.velocity;
-                velocity.y = 0f;
-                return velocity;
+                Sample();
+                return _velocity;
             }
+        }
+
+        // Longer than this between two reads and the difference is not movement, world
+        // seconds. A scene load is the case that matters: it would otherwise read as a
+        // player crossing the house in one frame.
+        private const float MaxSampleGap = 0.5f;
+
+        private Vector3 _lastPosition;
+        private float _lastSampledAt;
+        private Vector3 _velocity;
+
+        private void Sample()
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (Transform == null)
+            {
+                _velocity = Vector3.zero;
+                return;
+            }
+
+            var now = Time.time;
+            var elapsed = now - _lastSampledAt;
+
+            // Already answered this frame. Both brains and the outcome all ask, and the
+            // difference between two reads in the same frame is zero — which would wipe
+            // the real value for whoever asked second.
+            if (elapsed <= 0f)
+            {
+                return;
+            }
+
+            var position = Transform.position;
+
+            if (elapsed > MaxSampleGap)
+            {
+                _velocity = Vector3.zero;
+            }
+            else
+            {
+                var travel = position - _lastPosition;
+                travel.y = 0f;
+                _velocity = travel / elapsed;
+            }
+
+            _lastPosition = position;
+            _lastSampledAt = now;
         }
 
         /// <summary>

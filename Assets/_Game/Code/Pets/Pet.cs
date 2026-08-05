@@ -43,6 +43,15 @@ namespace _Game.Code.Pets
                  "interactor so the authority can re-check it, not just the asking client.")]
         [SerializeField] private float captureDistance = 1.5f;
 
+        [Tooltip("Extra reach the authority allows when re-checking a client's grab, " +
+                 "world m. The server judges the asking avatar by a position that " +
+                 "arrived late and smoothed over the wire, so re-checking captureDistance " +
+                 "exactly refuses grabs the client's own screen showed in range — the " +
+                 "same idea as Door.serverReach, a sanity bound rather than a second " +
+                 "reach rule. Provisional until the lag is measured at sprint speed on " +
+                 "two machines.")]
+        [SerializeField] private float serverSlack = 0.5f;
+
         [Tooltip("Where the animal lands when released, metres in front of the carrier.")]
         [SerializeField] private float dropDistance = 0.6f;
 
@@ -164,7 +173,20 @@ namespace _Game.Code.Pets
             {
                 if (_isCarried)
                 {
-                    ApplyRelease(FindDropPosition(Carrier == null ? transform : Carrier.transform));
+                    // Only the authority works the spot out. FindDropPosition asks this
+                    // machine's own physics about a carrier position that arrived late,
+                    // and the branches disagree per machine at walls and doorways — but
+                    // the animal's position is server state (NetworkTransform, not client
+                    // authoritative), so a locally chosen spot is overwritten a tick
+                    // later and the animal visibly pops. A non-authority peer keeps where
+                    // it stands and lets the real position arrive over the wire; it is
+                    // here only to re-enable the capsule and clear the slots. Same
+                    // discipline ApplyRelease already applies to the NavMeshAgent.
+                    var where = IsAuthority
+                        ? FindDropPosition(Carrier == null ? transform : Carrier.transform)
+                        : transform.position;
+
+                    ApplyRelease(where);
                 }
 
                 return;
@@ -181,15 +203,19 @@ namespace _Game.Code.Pets
         /// The rule: is this animal free, are those hands free, and are they close
         /// enough. Pure — it changes nothing, so the host can ask it about a request
         /// that arrived over the wire.
+        ///
+        /// <paramref name="slack"/> is extra reach in world metres, zero by default so
+        /// every caller keeps the exact rule; only the server's re-check of a client's
+        /// request passes it (see <see cref="serverSlack"/>).
         /// </summary>
-        public bool CanBeTakenBy(PlayerHands hands)
+        public bool CanBeTakenBy(PlayerHands hands, float slack = 0f)
         {
             if (hands == null || Carrier != null || !hands.IsEmpty)
             {
                 return false;
             }
 
-            return Vector3.Distance(hands.transform.position, transform.position) <= captureDistance;
+            return Vector3.Distance(hands.transform.position, transform.position) <= captureDistance + slack;
         }
 
         /// <summary>
@@ -232,7 +258,12 @@ namespace _Game.Code.Pets
             }
 
             var hands = asker.GetComponent<PlayerHands>();
-            if (hands != null && CanBeTakenBy(hands))
+
+            // Judged with the allowance: the position this avatar has here arrived late
+            // and smoothed, so the exact rule would refuse a grab the client's own
+            // screen showed in range. The client-side rule stays exact — the slack is
+            // only ever spent on a request that already passed it there.
+            if (hands != null && CanBeTakenBy(hands, serverSlack))
             {
                 Take(hands);
             }

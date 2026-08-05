@@ -5,6 +5,7 @@ using FishNet.Managing.Scened;
 using FishNet.Object;
 using FishNet.Transporting;
 using _Game.Code.AI;
+using _Game.Code.App;
 using _Game.Code.Level;
 using _Game.Code.Noise;
 using _Game.Code.OldMan;
@@ -27,7 +28,7 @@ namespace _Game.Code
     /// referenced by another prefab up front.
     ///
     /// Named for the level on purpose: the application's own entry point is
-    /// <see cref="App.LevelBootstrapper"/> in the Loading scene, and it is a different
+    /// <see cref="App.Bootstrapper"/> in the Loading scene, and it is a different
     /// thing with a different lifetime — this one dies with the raid.
     /// </summary>
     public class LevelBootstrapper : MonoBehaviour
@@ -53,6 +54,14 @@ namespace _Game.Code
         [Header("Spawning")]
         [Tooltip("0 draws a fresh layout every run; any other value repeats the same one.")]
         [SerializeField] private int seed;
+
+        [Tooltip("How long the server waits for every connection to load the level " +
+                 "before giving up on the stragglers, seconds. On the deadline a " +
+                 "straggler is disconnected rather than spawned past: spawning actors " +
+                 "at a connection that does not have the scene sends them into the " +
+                 "wrong one — measured 2026-08-05, the client's animals landed in the " +
+                 "Lobby and its avatar fell through a floor that did not exist yet.")]
+        [SerializeField] private float loadTimeout = 30f;
 
         /// <summary>The local player's avatar, or null if it could not be placed.</summary>
         public GameObject Player { get; private set; }
@@ -88,6 +97,10 @@ namespace _Game.Code
 
         private bool _laidOut;
 
+        // Unscaled time, and 0 means "not waiting for anybody" — set only on the server,
+        // zeroed once the deadline has been acted on.
+        private float _layoutDeadline;
+
         /// <summary>
         /// The raid's entry point, for the avatars that arrive replicated and have to
         /// find it. Static for the same reason RaidSession.Active is, and it holds no
@@ -100,10 +113,12 @@ namespace _Game.Code
         // networking at all — pressing Play straight into this scene — we are our own
         // server and everything happens locally, which is what keeps the game playable
         // in one process.
-        private static bool IsAuthority =>
-            InstanceFinder.NetworkManager == null || !InstanceFinder.IsClientStarted || InstanceFinder.IsServerStarted;
+        private static bool IsAuthority => Authority.DecidesHere;
 
-        private static bool IsNetworked => InstanceFinder.NetworkManager != null && InstanceFinder.IsServerStarted;
+        // Strictly "am I the running server", which is not the same question as
+        // IsAuthority above: a process with no networking answers no here and yes
+        // there. This one gates the calls that need a real ServerManager.
+        private static bool IsServer => InstanceFinder.NetworkManager != null && InstanceFinder.IsServerStarted;
 
         private void Awake()
         {
@@ -129,7 +144,7 @@ namespace _Game.Code
             // Off the network there is nobody to wait for, and on a client nothing is
             // created here anyway — both lay out immediately and behave exactly as
             // before.
-            if (!IsNetworked)
+            if (!IsServer)
             {
                 LayOut();
                 return;
@@ -147,6 +162,45 @@ namespace _Game.Code
             // good, taking the floor with it.
             InstanceFinder.SceneManager.OnClientPresenceChangeEnd += OnClientPresenceChangeEnd;
             InstanceFinder.ServerManager.OnRemoteConnectionState += OnConnectionStateForLayout;
+            _layoutDeadline = Time.unscaledTime + loadTimeout;
+            LayOutWhenEveryoneHasTheScene();
+        }
+
+        // The deadline on that wait. A raid that waits for ever for a connection which
+        // will never finish loading strands the host worst of all: no avatar means no
+        // camera, no HUD and no end screen, so there is no way out of an empty house.
+        // The existing handler already reroutes the layout when a connection drops —
+        // all this adds is the decision that a straggler counts as dropped.
+        private void Update()
+        {
+            if (_laidOut || _layoutDeadline <= 0f || Time.unscaledTime < _layoutDeadline)
+            {
+                return;
+            }
+
+            _layoutDeadline = 0f;
+
+            // Collected first: disconnecting runs callbacks that mutate the very
+            // collection we would be iterating.
+            var scene = gameObject.scene;
+            var stragglers = new List<NetworkConnection>();
+            foreach (var connection in InstanceFinder.ServerManager.Clients.Values)
+            {
+                if (!connection.Scenes.Contains(scene))
+                {
+                    stragglers.Add(connection);
+                }
+            }
+
+            for (var i = 0; i < stragglers.Count; i++)
+            {
+                Debug.LogWarning($"LevelBootstrapper: connection {stragglers[i].ClientId} did not load the level " +
+                                 $"within {loadTimeout}s, disconnecting it so the raid can start.");
+                stragglers[i].Disconnect(true);
+            }
+
+            // Asked once more rather than left to the disconnect callback: that callback
+            // may or may not have fired synchronously above, and this is idempotent.
             LayOutWhenEveryoneHasTheScene();
         }
 
@@ -219,12 +273,17 @@ namespace _Game.Code
 
             if (IsAuthority)
             {
-                SpawnPlayers(PointsOf(_points, SpawnKind.Player));
-
+                // The groups of fixed size draw first, and the one whose size varies
+                // draws last. All three share a single spawner stream, and the players'
+                // draw consumes one number per connection — drawn first, the same seed
+                // would give a different animal layout for two players than for four,
+                // which is exactly the case a fixed seed exists to rule out.
                 _pets.AddRange(Place(petPrefabs, PointsOf(_points, SpawnKind.Pet)));
 
                 var oldMen = Place(new[] { oldManPrefab }, PointsOf(_points, SpawnKind.OldMan));
                 OldMan = oldMen.Count > 0 ? oldMen[0] : null;
+
+                SpawnPlayers(PointsOf(_points, SpawnKind.Player));
             }
 
             CollectActors();
@@ -249,7 +308,7 @@ namespace _Game.Code
         // what keeps this level playable on its own.
         private void SpawnRaidState()
         {
-            if (!IsNetworked || raidStatePrefab == null)
+            if (!IsServer || raidStatePrefab == null)
             {
                 return;
             }
@@ -269,7 +328,7 @@ namespace _Game.Code
         /// </summary>
         private void SpawnPlayers(IReadOnlyList<Transform> playerPoints)
         {
-            if (!IsNetworked)
+            if (!IsServer)
             {
                 var solo = Place(new[] { playerPrefab }, playerPoints);
                 if (solo.Count == 0)
@@ -444,7 +503,7 @@ namespace _Game.Code
                 var nob = instance.GetComponent<NetworkObject>();
                 if (nob != null)
                 {
-                    if (IsNetworked)
+                    if (IsServer)
                     {
                         // Owned by nobody: the animals and Old Man belong to the rules,
                         // not to a player. Spawning is still the server's, so every peer

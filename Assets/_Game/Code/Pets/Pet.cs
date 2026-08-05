@@ -98,6 +98,11 @@ namespace _Game.Code.Pets
         // ride the right pair of hands on all four screens.
         private readonly SyncVar<NetworkObject> _carrierObject = new SyncVar<NetworkObject>();
 
+        // Aboard the saucer. Its own value rather than a side effect of the carrier
+        // being cleared, because releasing an animal and handing it over are different
+        // things and only one of them takes it out of the level.
+        private readonly SyncVar<bool> _delivered = new SyncVar<bool>();
+
         // Presentation of being carried lives here rather than in PetBrain, because
         // the brain is the animal's decision-making and will run on one machine only,
         // while being carried has to look and sound the same on all of them.
@@ -141,11 +146,13 @@ namespace _Game.Code.Pets
             _nob = GetComponent<NetworkObject>();
 
             _carrierObject.OnChange += OnCarrierChanged;
+            _delivered.OnChange += OnDeliveredChanged;
         }
 
         private void OnDestroy()
         {
             _carrierObject.OnChange -= OnCarrierChanged;
+            _delivered.OnChange -= OnDeliveredChanged;
         }
 
         // The one place the change is applied, on every peer. The authority writes the
@@ -252,8 +259,28 @@ namespace _Game.Code.Pets
         /// Handed over to the saucer: off the level and counted (MECHANICS.md 4.5).
         /// Lives here rather than in LevelGoal so that the NavMeshAgent gets switched
         /// off in the same place everything else about this animal is.
+        ///
+        /// Decided by the authority and carried to everybody by the flag below. Being
+        /// aboard is not something a peer can work out for itself: the rule is about
+        /// where the *carrier* stood, and only one machine judges that.
         /// </summary>
         public void Deliver()
+        {
+            if (!IsReplicated)
+            {
+                ApplyDeliver();
+                return;
+            }
+
+            if (IsAuthority)
+            {
+                // Every peer, this one included, reacts in OnDeliveredChanged.
+                _delivered.Value = true;
+            }
+        }
+
+        // The state change: the animal is gone from the level, on every screen.
+        private void ApplyDeliver()
         {
             if (_agent != null)
             {
@@ -263,6 +290,14 @@ namespace _Game.Code.Pets
             }
 
             gameObject.SetActive(false);
+        }
+
+        private void OnDeliveredChanged(bool previous, bool next, bool asServer)
+        {
+            if (next)
+            {
+                ApplyDeliver();
+            }
         }
 
         /// <summary>Puts the animal back on the floor and frees both slots.</summary>

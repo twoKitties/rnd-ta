@@ -78,6 +78,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27859a5202fff214194d3e866e66e8ae, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Pets.Pet
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 5013373475664358944}
+  _networkObjectCache: {fileID: 0}
   carrySpeedMultiplier: 0.65
   carryPose: 0
   captureDistance: 1.5

@@ -561,6 +561,12 @@ namespace _Game.Code
             {
                 status.Bind(levelGoal);
             }
+
+            var endScreen = avatar.GetComponentInChildren<EndScreenUI>(true);
+            if (endScreen != null)
+            {
+                endScreen.Bind(levelGoal);
+            }
         }
 
         private static List<Transform> PointsOf(IReadOnlyList<SpawnPoint> points, SpawnKind kind)

@@ -1,3 +1,5 @@
+using _Game.Code.Player;
+using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 
@@ -76,6 +78,35 @@ namespace _Game.Code.Level
             }
 
             _delivered.Value = _delivered.Value + 1;
+        }
+
+        /// <summary>
+        /// A client is putting its animal down and wants to know whether that counted.
+        /// It lands here because <see cref="LevelGoal"/> is a plain scene component and
+        /// cannot carry an RPC of its own — the same division as DoorState and the eight
+        /// door leaves.
+        ///
+        /// The server re-runs the whole rule rather than believing the answer: it checks
+        /// that the avatar really belongs to the connection that asked, and then asks the
+        /// goal, on this machine, whether those hands are standing in the beam
+        /// (MECHANICS.md 4.5, 7.4).
+        /// </summary>
+        [ServerRpc(RequireOwnership = false)]
+        public void RequestRelease(NetworkObject carrier, NetworkConnection sender = null)
+        {
+            if (carrier == null || sender == null || carrier.Owner != sender)
+            {
+                return;
+            }
+
+            var goal = LevelGoal.Current;
+            var hands = carrier.GetComponent<PlayerHands>();
+
+            // Unity objects: a destroyed one compares == null but is not a real null.
+            if (goal != null && hands != null)
+            {
+                goal.ReleaseCarried(hands);
+            }
         }
 
         /// <summary>Latch the outcome so it stops being recomputed and starts being shown.</summary>

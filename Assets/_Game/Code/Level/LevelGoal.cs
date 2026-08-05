@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using _Game.Code.AI;
 using _Game.Code.Pets;
 using _Game.Code.Player;
+using FishNet.Object;
 using UnityEngine;
 
 namespace _Game.Code.Level
@@ -16,6 +17,27 @@ namespace _Game.Code.Level
     public class LevelGoal : MonoBehaviour
     {
         [SerializeField] private BeamZone beamZone;
+
+        /// <summary>
+        /// The running level's goal. A static for the same reason LevelBootstrapper.Current
+        /// is one: <see cref="RaidState"/> is a spawned object and has to reach the
+        /// scene's rules when a request lands on the server, without searching for them
+        /// (MECHANICS.md 7.6). It holds no player state, so 7.3 is not in play.
+        /// </summary>
+        public static LevelGoal Current { get; private set; }
+
+        private void Awake()
+        {
+            Current = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (Current == this)
+            {
+                Current = null;
+            }
+        }
 
         // Replicated when a raid is networked, local when it is not. Deliberately a
         // plain MonoBehaviour holding a reference rather than a NetworkBehaviour: this
@@ -100,6 +122,23 @@ namespace _Game.Code.Level
         {
             if (hands == null || hands.IsEmpty)
             {
+                return false;
+            }
+
+            // A client does not get to decide that an animal was handed over — and until
+            // 2026-08-05 it did, which is why only the host could ever deliver one: the
+            // client ran this whole method locally, hid the animal on its own screen and
+            // incremented nothing, while the server never heard about it at all. The
+            // request goes to the authority and comes back as replicated state, the same
+            // shape as Pet.TryTake and Door.Use.
+            if (!IsAuthority)
+            {
+                var avatar = hands.GetComponent<NetworkObject>();
+                if (avatar != null && Shared != null)
+                {
+                    Shared.RequestRelease(avatar);
+                }
+
                 return false;
             }
 

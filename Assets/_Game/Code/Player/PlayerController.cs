@@ -91,6 +91,14 @@ namespace _Game.Code.Player
         public PlayerIntent Intent { get; set; }
 
         /// <summary>
+        /// Where this avatar's eyes are: the transform <see cref="Look"/> pitches, and
+        /// the one a spectator copies to look out of a teammate's head. Exposed rather
+        /// than searched for by name, because the camera is a child of a prefab that
+        /// exists up to four times over.
+        /// </summary>
+        public Transform CameraRoot => cameraRoot;
+
+        /// <summary>
         /// The Interact button's name for the HUD — "E" on a keyboard. Comes from the
         /// bindings, so it follows the .inputactions asset instead of being retyped
         /// in the UI. DontIncludeInteractions strips the "Hold " the asset's own

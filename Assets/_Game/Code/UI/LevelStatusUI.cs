@@ -6,9 +6,10 @@ using UnityEngine.UI;
 namespace _Game.Code.UI
 {
     /// <summary>
-    /// The raid's score on the player's own HUD: how many animals are aboard, and
-    /// the outcome once there is one. Section 6 of MECHANICS.md defers the real
-    /// end screen — this is the counter and one line, nothing more.
+    /// The raid's score on the player's own HUD while it is running: how many animals
+    /// are aboard, and whether this player has been shot. The outcome itself belongs to
+    /// <see cref="EndScreenUI"/> — once there is one, this whole line goes quiet, so
+    /// there is exactly one place on screen saying how the raid ended.
     /// </summary>
     public class LevelStatusUI : MonoBehaviour
     {
@@ -49,16 +50,19 @@ namespace _Game.Code.UI
                 return;
             }
 
+            // Once the raid is over, EndScreenUI takes the screen and says so itself.
+            // This line goes quiet rather than repeating it: the panel's background is
+            // translucent, so a second "RAID FAILED" underneath reads as the text
+            // doubling (reported 2026-08-05).
+            if (_goal.IsWon || _goal.IsLost)
+            {
+                Write(counter, ref _shownCounter, string.Empty);
+                Write(result, ref _shownResult, string.Empty);
+                return;
+            }
+
             Write(counter, ref _shownCounter, $"Pets: {_goal.Delivered}/{_goal.Total}");
-
-            // The raid's outcome outranks a personal death: once it is over, "won" or
-            // "lost" is what everybody needs to read, dead or alive.
-            var outcome = _goal.IsWon ? "YOU WIN"
-                : _goal.IsLost ? "RAID FAILED"
-                : dead ? "YOU DIED"
-                : string.Empty;
-
-            Write(result, ref _shownResult, outcome);
+            Write(result, ref _shownResult, dead ? "YOU DIED" : string.Empty);
         }
 
         // Assigning Text.text rebuilds the mesh, so only touch it when the line

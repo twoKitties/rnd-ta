@@ -142,6 +142,17 @@ namespace _Game.Code.UI
             // and a Start button that works before there is a session to start.
             ShowConnecting(false);
             Repaint();
+
+            // Why the last session ended, if it ended on its own. It is collected here
+            // rather than delivered by an event because the thing that ended it happened
+            // in the Level, a scene ago — there was nothing on screen then that could
+            // have said it, and ClosePopup above would have wiped it anyway. Consumed,
+            // so it is shown once.
+            var notice = RaidSession.Active == null ? null : RaidSession.Active.ConsumeNotice();
+            if (!string.IsNullOrEmpty(notice))
+            {
+                ShowPopup(notice);
+            }
         }
 
         private void OnDestroy()

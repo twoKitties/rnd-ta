@@ -42,6 +42,15 @@ namespace _Game.Code.Player
             base.OnStartClient();
             Apply(IsOwner);
 
+            // The session watches for this one going missing — it is what tells a client
+            // that the raid it is standing in no longer exists. Told from here rather
+            // than looked for from there, so the session layer keeps knowing nothing
+            // about the level.
+            if (IsOwner && App.RaidSession.Active != null)
+            {
+                App.RaidSession.Active.LocalAvatarSpawned();
+            }
+
             // Registered from the avatar rather than by whoever created it, for the
             // same reason: three of the four were not created here at all. The level's
             // entry point exists on every peer, so both the AI's view of the players
@@ -55,6 +64,11 @@ namespace _Game.Code.Player
         public override void OnStopClient()
         {
             base.OnStopClient();
+
+            if (IsOwner && App.RaidSession.Active != null)
+            {
+                App.RaidSession.Active.LocalAvatarLost();
+            }
 
             if (LevelBootstrapper.Current != null)
             {
@@ -94,7 +108,31 @@ namespace _Game.Code.Player
             if (isLocal)
             {
                 Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
             }
+        }
+
+        /// <summary>
+        /// Whatever locked the cursor has to be what unlocks it, and this is the only
+        /// thing that always runs: the avatar can go away without anybody choosing it —
+        /// the host ends the session, the connection drops, the level is reloaded — and
+        /// then EndScreenUI never opened, so nothing else had a reason to hand the
+        /// cursor back. Measured 2026-08-05: after a disconnect the lobby came up with a
+        /// locked, invisible cursor and its popup could not be clicked.
+        ///
+        /// Free is the right default here, because everything an avatar can be replaced
+        /// by — the lobby, or a fresh avatar that locks it again in Apply — either wants
+        /// a mouse or takes it back immediately.
+        /// </summary>
+        private void OnDestroy()
+        {
+            if (!IsLocal)
+            {
+                return;
+            }
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
     }
 }

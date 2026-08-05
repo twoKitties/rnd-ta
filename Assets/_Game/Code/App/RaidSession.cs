@@ -61,6 +61,17 @@ namespace _Game.Code.App
                  "ten times), but only if it is answering at all — this is the backstop.")]
         [SerializeField] private float connectTimeout = 8f;
 
+        [Tooltip("How long a silent connection is kept before the transport declares the " +
+                 "other end gone, seconds. Tugboat's own default is 1800 — half an hour — " +
+                 "which is a debugger's value, not a game's. Raise it if you attach a " +
+                 "breakpoint, because a stall longer than this now drops the session.")]
+        [SerializeField] private float deadPeerTimeout = 8f;
+
+        [Tooltip("How long a client may sit in a raid with no avatar of its own before " +
+                 "it gives up and returns to the lobby, seconds. Generous, because a " +
+                 "restart legitimately takes the avatar away for a scene load or two.")]
+        [SerializeField] private float orphanTimeout = 10f;
+
         /// <summary>True once the raid has started and the lobby has closed.</summary>
         public bool IsRaidRunning { get; private set; }
 
@@ -79,6 +90,20 @@ namespace _Game.Code.App
 
         // When the attempt gives up if nothing has answered. Zero means no attempt.
         private float _attemptDeadline;
+
+        // We have been in a session at some point and have not been put back in the
+        // lobby yet. This is what the backstop in Update watches: a raid must not be
+        // able to outlive the connection it belongs to.
+        private bool _inSession;
+
+        // When this client last lost its own avatar, or zero while it has one.
+        private float _avatarLostAt;
+
+        // Why the last session ended, when it ended without being asked to. Held rather
+        // than raised as an event: it happens in the Level, and the only thing that can
+        // show it is the lobby's popup, which does not exist until a scene later. An
+        // event would be shouted into an empty room.
+        private string _notice;
 
         /// <summary>True on the machine that is hosting — the one that owns the rules.</summary>
         public bool IsHost => InstanceFinder.IsServerStarted;
@@ -188,6 +213,24 @@ namespace _Game.Code.App
             manager.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
             manager.ServerManager.OnServerConnectionState += OnServerConnectionState;
             manager.ClientManager.OnClientConnectionState += OnClientConnectionState;
+
+            // Measured 2026-08-05, and it is why a client whose host disappeared sat in
+            // a dead level until the application was killed: Tugboat leaves LiteNetLib's
+            // DisconnectTimeout at its own MAX_TIMEOUT_SECONDS of 1800, so a peer that
+            // stops answering without saying goodbye — a build closed by the task
+            // manager, a cable pulled — is not noticed for half an hour. Nothing above
+            // the transport can tell: FishNet still reports the client as started, so
+            // every "are we connected" check, including this class's own backstop,
+            // answers yes.
+            //
+            // A graceful close does send a disconnect and was always seen promptly;
+            // this is only about the ungraceful one.
+            var transport = manager.TransportManager.Transport;
+            if (transport != null)
+            {
+                transport.SetTimeout(deadPeerTimeout, true);
+                transport.SetTimeout(deadPeerTimeout, false);
+            }
         }
 
         private void OnDisable()
@@ -229,7 +272,11 @@ namespace _Game.Code.App
             // Every candidate, not just the one shown in the lobby: with a VPN up the
             // best guess can still be the wrong one, and the player needs to be able to
             // try the next.
-            Debug.Log($"RaidSession: hosting on port {port}. Addresses: {string.Join(", ", LocalAddresses())}");
+            // The timeout is in the line on purpose: when it is wrong, every symptom is
+            // "the other machine hangs", and the only way to tell a wrong value from a
+            // wrong cause is to read it out of the log of the run that failed.
+            Debug.Log($"RaidSession: hosting on port {port}, dead-peer timeout {deadPeerTimeout} s. " +
+                      $"Addresses: {string.Join(", ", LocalAddresses())}");
 
             BeginAttempt();
             if (InstanceFinder.ClientManager.StartConnection(hostAddress, port))
@@ -256,6 +303,8 @@ namespace _Game.Code.App
                 Fail("Адрес не разобран");
                 return false;
             }
+
+            Debug.Log($"RaidSession: joining {address}:{chosenPort}, dead-peer timeout {deadPeerTimeout} s.");
 
             BeginAttempt();
             if (InstanceFinder.ClientManager.StartConnection(address, chosenPort))
@@ -329,6 +378,53 @@ namespace _Game.Code.App
         }
 
         /// <summary>
+        /// Why the last session ended, if it ended on its own — and clears it, so it is
+        /// shown once and never again. Read by the lobby when it comes up, because that
+        /// is the first moment there is anything on screen able to say it.
+        ///
+        /// Empty after a session the player ended themselves: being told "the connection
+        /// was lost" after pressing Leave is worse than being told nothing.
+        /// </summary>
+        public string ConsumeNotice()
+        {
+            var notice = _notice;
+            _notice = null;
+            return notice;
+        }
+
+        /// <summary>
+        /// This client's own avatar has arrived. Told rather than looked for: the level
+        /// knows about the session, the session must not have to know about the level.
+        /// </summary>
+        public void LocalAvatarSpawned()
+        {
+            _avatarLostAt = 0f;
+        }
+
+        /// <summary>
+        /// This client's own avatar has been despawned, and it did not ask for that.
+        ///
+        /// This is the signal that survives when nothing else does. A host tearing its
+        /// server down despawns every object first and says goodbye second, and the
+        /// goodbye is a single unreliable UDP packet — measured 2026-08-05, the despawns
+        /// arrived and the disconnect did not, so FishNet went on reporting a healthy
+        /// connection while the client sat in a level with no avatar, no camera and no
+        /// menu. Losing our own avatar without leaving is not something that happens in
+        /// a working raid, so it is enough on its own.
+        ///
+        /// The host is exempt: it cannot be orphaned by itself.
+        /// </summary>
+        public void LocalAvatarLost()
+        {
+            if (IsHost || _avatarLostAt > 0f)
+            {
+                return;
+            }
+
+            _avatarLostAt = Time.unscaledTime;
+        }
+
+        /// <summary>
         /// Take everybody into the level. The host's call, and the moment the lobby
         /// closes: from here a new connection is refused rather than dropped into a
         /// raid whose state it has no way of catching up with.
@@ -349,6 +445,16 @@ namespace _Game.Code.App
         /// the outcome, the delivered count, who is dead, which doors are open, where
         /// the actors stand — is scene state, and LevelBootstrapper builds it from
         /// scratch on the way in.
+        ///
+        /// It goes out through the lobby, and that is not a detour for the look of it.
+        /// **FishNet will not load a scene that is already loaded**: `CanLoadScene`
+        /// (Scened/SceneManager.cs) returns false for one that is, unless stacking is
+        /// allowed — and the same scene is protected from the replace-unload as well,
+        /// because it is in the load request's own name list. Asking for `Level` while
+        /// `Level` is open therefore does exactly nothing, which is what Restart used to
+        /// do (measured 2026-08-05). Two loads through a scene that is *not* the level
+        /// is the way round it: the queue runs them in order and each is judged when it
+        /// is its turn, so by then the level really is gone.
         /// </summary>
         public void Restart()
         {
@@ -357,6 +463,10 @@ namespace _Game.Code.App
                 return;
             }
 
+            // IsRaidRunning deliberately stays true across both loads. It is the door on
+            // late join, and dropping it here would open that door for the moment the
+            // lobby is on screen.
+            LoadForEveryone(lobbyScene);
             LoadForEveryone(levelScene);
         }
 
@@ -387,6 +497,9 @@ namespace _Game.Code.App
         // so there is nobody to carry the load to.
         private void GoToLobbyAlone()
         {
+            _inSession = false;
+            _avatarLostAt = 0f;
+
             if (!string.IsNullOrEmpty(lobbyScene) && UnityScenes.GetActiveScene().name != lobbyScene)
             {
                 UnityScenes.LoadScene(lobbyScene);
@@ -435,6 +548,7 @@ namespace _Game.Code.App
             if (args.ConnectionState == LocalConnectionState.Started)
             {
                 EndAttempt();
+                _inSession = true;
                 var connected = Connected;
                 if (connected != null)
                 {
@@ -458,14 +572,52 @@ namespace _Game.Code.App
                 return;
             }
 
+            // Still in a session means we did not ask for this: Leave clears the flag
+            // before the transport ever reports Stopped, so a player who chose to go
+            // gets no popup and a player who was dropped does.
+            if (_inSession)
+            {
+                _notice = "Соединение с хостом потеряно";
+            }
+
             IsRaidRunning = false;
             GoToLobbyAlone();
         }
 
         private void Update()
         {
-            // The backstop. LiteNetLib gives up after about five seconds of its own
-            // accord, but only if it is running at all — an address that is routable
+            // The session is gone and we are still somewhere it put us. Watched every
+            // frame rather than handled in the disconnect callback alone, because that
+            // callback is one link in a chain FishNet runs while it is tearing every
+            // spawned object down — and a client left standing in a level with no host,
+            // no avatar and therefore no menu has no way out at all (reported
+            // 2026-08-05, host quitting the build). This asks the only question that
+            // matters and cannot be missed: are we still connected to anything.
+            if (_inSession && !IsConnecting && !InstanceFinder.IsClientStarted && !InstanceFinder.IsServerStarted)
+            {
+                IsRaidRunning = false;
+                _notice = "Соединение с хостом потеряно";
+                GoToLobbyAlone();
+                return;
+            }
+
+            // Orphaned: our avatar went away and no new one arrived. See LocalAvatarLost
+            // for why this exists at all — it is the only signal that reaches a client
+            // whose host tore the session down and whose goodbye packet was lost.
+            if (_avatarLostAt > 0f && !IsConnecting && Time.unscaledTime - _avatarLostAt > orphanTimeout)
+            {
+                Debug.LogWarning($"RaidSession: no avatar for {orphanTimeout} s and no new one arriving — " +
+                                 "treating the session as over and returning to the lobby.");
+
+                // Set before Leave, which goes through GoToLobbyAlone and would otherwise
+                // look exactly like the player having chosen to leave.
+                _notice = "Хост завершил игру";
+                Leave();
+                return;
+            }
+
+            // The other backstop. LiteNetLib gives up after about five seconds of its
+            // own accord, but only if it is running at all — an address that is routable
             // and silent can otherwise leave the button spinning for ever.
             if (!IsConnecting || Time.unscaledTime < _attemptDeadline)
             {

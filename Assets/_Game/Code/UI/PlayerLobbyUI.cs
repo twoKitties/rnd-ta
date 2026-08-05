@@ -56,7 +56,7 @@ namespace _Game.Code.UI
             var label = _readyButton.GetComponentInChildren<Text>();
             if (label != null)
             {
-                label.text = slot.Ready ? "Готов" : "Не готов";
+                label.text = slot.Ready ? "Ready" : "Not Ready";
             }
         }
 

@@ -132,8 +132,23 @@ namespace _Game.Code.UI
             // was saved at alpha 1 and the menu at 0, so the game opened on the lobby —
             // and, worse, every panel still blocked raycasts until the first switch, so
             // an invisible menu was catching clicks.
-            OpenMainMenu();
-            ShowStep(LobbyStep.Options);
+            //
+            // Coming back from a raid through ReturnToLobby leaves the connection up, and
+            // the Host/Connect screen is unusable to a machine that is already in a
+            // session — Host would only fail on its own busy port. So a live session lands
+            // straight on the player list; the roster survives the scene load and the
+            // Update watcher below fills the rows in once it is noticed.
+            if (RaidSession.Active != null && InstanceFinder.IsClientStarted)
+            {
+                OpenLobby();
+                ShowStep(LobbyStep.Players);
+            }
+            else
+            {
+                OpenMainMenu();
+                ShowStep(LobbyStep.Options);
+            }
+
             ClosePopup();
 
             // Same reason as the panel above: these two are authored visible in the

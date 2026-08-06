@@ -20,15 +20,7 @@ namespace _Game.Code.App
 
     /// <summary>
     /// Who is in the lobby, as shared state. Spawned by the host when the session
-    /// opens and alive for exactly as long as that session — through Lobby → Level →
-    /// Lobby — because its prefab's NetworkObject is marked global and FishNet keeps a
-    /// global object in the DDOL scene. It has to be: every scene change in a session
-    /// goes out with ReplaceOption.All, which destroys everything in the scene being
-    /// replaced, so a scene-local roster died on the host's first ReturnToLobby. The
-    /// lobby then showed the Host/Connect screen to a machine that was still hosting,
-    /// Host failed on its own busy port, and the only way into a second raid was to
-    /// quit the app (measured 2026-08-05). It still says nothing about a raid in
-    /// progress — the raid's own state is RaidState.
+    /// opens and destroyed with the lobby — it says nothing about a raid in progress.
     ///
     /// The three parts of every change are kept apart the way the rest of this
     /// codebase keeps them (MECHANICS.md 7.4): the client <em>asks</em> through a

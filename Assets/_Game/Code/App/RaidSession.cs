@@ -6,6 +6,7 @@ using FishNet;
 using FishNet.Connection;
 using FishNet.Managing.Scened;
 using FishNet.Transporting;
+using _Game.Code.UI;
 using UnityEngine;
 
 // Both FishNet and Unity have a SceneManager and this file uses both. The alias keeps
@@ -67,13 +68,10 @@ namespace _Game.Code.App
                  "breakpoint, because a stall longer than this now drops the session.")]
         [SerializeField] private float deadPeerTimeout = 8f;
 
-        [Tooltip("How long a client may stand in the level with no avatar of its own " +
-                 "before it gives up and returns to the lobby, seconds. Counted only " +
-                 "while the level scene is active — everywhere else having no avatar " +
-                 "is the normal state. Generous, because the moment avatars appear is " +
-                 "set by the slowest machine's scene load (LevelBootstrapper waits for " +
-                 "everyone); measure that on the slowest tested machine before lowering.")]
-        [SerializeField] private float orphanTimeout = 20f;
+        [Tooltip("How long a client may sit in a raid with no avatar of its own before " +
+                 "it gives up and returns to the lobby, seconds. Generous, because a " +
+                 "restart legitimately takes the avatar away for a scene load or two.")]
+        [SerializeField] private float orphanTimeout = 10f;
 
         /// <summary>True once the raid has started and the lobby has closed.</summary>
         public bool IsRaidRunning { get; private set; }
@@ -99,12 +97,7 @@ namespace _Game.Code.App
         // able to outlive the connection it belongs to.
         private bool _inSession;
 
-        // Whether this client currently has an avatar of its own. Told by LocalAvatar;
-        // what it means depends on the scene, which is why Update interprets it there.
-        private bool _hasAvatar;
-
-        // When Update first saw us orphaned — in the level with no avatar — or zero
-        // while we are not.
+        // When this client last lost its own avatar, or zero while it has one.
         private float _avatarLostAt;
 
         // Why the last session ended, when it ended without being asked to. Held rather
@@ -406,8 +399,12 @@ namespace _Game.Code.App
         /// </summary>
         public void LocalAvatarSpawned()
         {
-            _hasAvatar = true;
             _avatarLostAt = 0f;
+
+            if (LoadingScreen.Active != null)
+            {
+                LoadingScreen.Active.RaidReady();
+            }
         }
 
         /// <summary>
@@ -418,17 +415,19 @@ namespace _Game.Code.App
         /// goodbye is a single unreliable UDP packet — measured 2026-08-05, the despawns
         /// arrived and the disconnect did not, so FishNet went on reporting a healthy
         /// connection while the client sat in a level with no avatar, no camera and no
-        /// menu.
+        /// menu. Losing our own avatar without leaving is not something that happens in
+        /// a working raid, so it is enough on its own.
         ///
-        /// Only recorded here; judged in Update, against the scene. The despawn itself
-        /// proves nothing — every ReturnToLobby and both loads of a Restart despawn our
-        /// avatar too (netcode audit 2026-08-05: the timer armed on the event alone
-        /// threw clients out of healthy sessions on both). Standing in the *level* with
-        /// no avatar is what does not happen in a working raid.
+        /// The host is exempt: it cannot be orphaned by itself.
         /// </summary>
         public void LocalAvatarLost()
         {
-            _hasAvatar = false;
+            if (IsHost || _avatarLostAt > 0f)
+            {
+                return;
+            }
+
+            _avatarLostAt = Time.unscaledTime;
         }
 
         /// <summary>
@@ -444,7 +443,7 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = true;
-            LoadForEveryone(levelScene);
+            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
         }
 
         /// <summary>
@@ -473,8 +472,10 @@ namespace _Game.Code.App
             // IsRaidRunning deliberately stays true across both loads. It is the door on
             // late join, and dropping it here would open that door for the moment the
             // lobby is on screen.
-            LoadForEveryone(lobbyScene);
-            LoadForEveryone(levelScene);
+            // Intermediate lobby stamped RaidReady too, so the screen does not lift on
+            // the way through.
+            LoadForEveryone(lobbyScene, LoadingScreen.Wait.RaidReady);
+            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
         }
 
         /// <summary>Everybody back to the lobby, with the session still up.</summary>
@@ -486,17 +487,26 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = false;
-            LoadForEveryone(lobbyScene);
+            LoadForEveryone(lobbyScene, LoadingScreen.Wait.MainMenu);
         }
 
         // Through FishNet's own scene manager rather than Unity's: it is what carries
         // the load to every client and what keeps spawned objects attached to the right
         // scene. ReplaceOption.All because a raid is not additive — the old scene must
         // be gone, or two levels' worth of actors exist at once.
-        private void LoadForEveryone(string sceneName)
+        //
+        // destination is where the whole transition ends, not this load. Restart's Lobby
+        // is indistinguishable on the wire from ReturnToLobby's, and the server does not
+        // wait for clients between queued operations — without the stamp a client sits
+        // in the main menu for the whole of the server's Level load.
+        private void LoadForEveryone(string sceneName, LoadingScreen.Wait destination)
         {
             var data = new SceneLoadData(sceneName);
             data.ReplaceScenes = ReplaceOption.All;
+
+            // ClientParams is the half of LoadParams that travels; ServerParams is [NonSerialized].
+            data.Params.ClientParams = new[] { (byte)destination };
+
             InstanceFinder.SceneManager.LoadGlobalScenes(data);
         }
 
@@ -506,6 +516,12 @@ namespace _Game.Code.App
         {
             _inSession = false;
             _avatarLostAt = 0f;
+
+            // Also re-targets a screen still waiting for a raid that will never start.
+            if (LoadingScreen.Active != null)
+            {
+                LoadingScreen.Active.Show(LoadingScreen.Wait.MainMenu);
+            }
 
             if (!string.IsNullOrEmpty(lobbyScene) && UnityScenes.GetActiveScene().name != lobbyScene)
             {
@@ -608,27 +624,13 @@ namespace _Game.Code.App
                 return;
             }
 
-            // Orphaned: we are in the level with no avatar of our own. See
-            // LocalAvatarLost for why this exists at all — it is the only signal that
-            // reaches a client whose host tore the session down and whose goodbye
-            // packet was lost. An avatar is only expected inside the level: after
-            // ReturnToLobby, or during the lobby interlude of a Restart, having none
-            // is the normal state, so the clock only runs while the level scene is
-            // active and resets everywhere else.
-            var orphaned = _inSession && !IsHost && !IsConnecting && !_hasAvatar &&
-                           UnityScenes.GetActiveScene().name == levelScene;
-            if (!orphaned)
+            // Orphaned: our avatar went away and no new one arrived. See LocalAvatarLost
+            // for why this exists at all — it is the only signal that reaches a client
+            // whose host tore the session down and whose goodbye packet was lost.
+            if (_avatarLostAt > 0f && !IsConnecting && Time.unscaledTime - _avatarLostAt > orphanTimeout)
             {
-                _avatarLostAt = 0f;
-            }
-            else if (_avatarLostAt == 0f)
-            {
-                _avatarLostAt = Time.unscaledTime;
-            }
-            else if (Time.unscaledTime - _avatarLostAt > orphanTimeout)
-            {
-                Debug.LogWarning($"RaidSession: in the level with no avatar for {orphanTimeout} s and no new " +
-                                 "one arriving — treating the session as over and returning to the lobby.");
+                Debug.LogWarning($"RaidSession: no avatar for {orphanTimeout} s and no new one arriving — " +
+                                 "treating the session as over and returning to the lobby.");
 
                 // Set before Leave, which goes through GoToLobbyAlone and would otherwise
                 // look exactly like the player having chosen to leave.

@@ -33,6 +33,13 @@ namespace _Game.Code.Doors
         [Tooltip("As loud as a step: above Old Man's threshold, below the animals'.")]
         [SerializeField] private float useNoise = 25f;
 
+        [Header("Sound")]
+        [Tooltip("The hinge. On the leaf rather than on whoever opened it: Door.EmitNoise " +
+                 "runs on the server only, and it is the hinge that creaks anyway.")]
+        [SerializeField] private AudioSource creakSource;
+
+        [SerializeField] private AudioClip creak;
+
         [Header("Authority")]
         [Tooltip("How far from the leaf a request is still believed, world m. Generous " +
                  "against the player's own reach of 1.5: this is a sanity check against " +
@@ -155,11 +162,27 @@ namespace _Game.Code.Doors
         /// The state change: the only thing that writes <see cref="IsOpen"/>, and the
         /// only thing that travels — one float. Every peer runs it, so a leaf opened
         /// by one player is open for the pets' pathing on every machine.
+        ///
+        /// <paramref name="silent"/> is for the case where this is not a door being
+        /// used but a door being *described*: a client that has just joined is told the
+        /// state of all eight at once, and without this it would walk into a volley of
+        /// eight creaks from doors that were opened minutes ago.
         /// </summary>
-        public void ApplySwing(float targetAngle)
+        public void ApplySwing(float targetAngle, bool silent = false)
         {
+            // Asked before the write. A leaf can be handed the angle it already has —
+            // the same value written to the replicated list again — and a hinge that
+            // creaks without moving reads as a ghost.
+            var moved = !Mathf.Approximately(targetAngle, _targetAngle);
+
             _targetAngle = targetAngle;
             IsOpen = !Mathf.Approximately(targetAngle, 0f);
+
+            // Unity objects: a destroyed one compares == null but is not a real null.
+            if (moved && !silent && creakSource != null && creak != null)
+            {
+                creakSource.PlayOneShot(creak);
+            }
         }
 
         private void Awake()

@@ -98,6 +98,11 @@ namespace _Game.Code.OldMan
         [Tooltip("Seconds he stands in place refilling the magazine. The raid's window to run.")]
         [SerializeField] private float reloadTime = 3f;
 
+        [Tooltip("Shortest gap between two shells, s — the pump between shots. Without " +
+                 "it the only gap is the aim delay, so a second player in the room dies " +
+                 "0.4 s after the first (MECHANICS.md section 2).")]
+        [SerializeField] private float shotCooldown = 2f;
+
         [Header("Doors (MECHANICS.md 5.5)")]
         [Tooltip("How close he must be to a leaf to pull it. Same reach the player has.")]
         [SerializeField] private float doorReach = 1.5f;
@@ -150,6 +155,11 @@ namespace _Game.Code.OldMan
         private float _aimLeft;
         private int _shellsLeft;
         private float _reloadLeft;
+
+        // When the pump has cycled and the gun can fire again. Absolute time rather
+        // than a countdown, so it survives him leaving Aim and coming back — which
+        // he does after every shot.
+        private float _nextShotAt;
         private float _repathAt;
         private float _doorWaitUntil;
 
@@ -283,6 +293,16 @@ namespace _Game.Code.OldMan
                 return;
             }
 
+            // The pump. He keeps the target lined up — Halt and FaceTowards above run
+            // every frame, and Think keeps refreshing _targetSpot while the player is
+            // visible — so this is a man with you in his sights and a spent chamber,
+            // not a man who has forgotten you. Break his line of sight during it and
+            // the branch above cancels the shot exactly as it does during the aim delay.
+            if (Time.time < _nextShotAt)
+            {
+                return;
+            }
+
             Shoot();
         }
 
@@ -291,9 +311,10 @@ namespace _Game.Code.OldMan
             // The kill left this method on 2026-08-06: ShotFlash grows a ShotPellet
             // from the muzzle on every peer, and death happens where it lands (5.2).
             // A dodged pellet leaves the victim alive and in view, so the sight
-            // check re-aims at them on the very next frame — the aim delay doubles
-            // as his rate of fire.
-            //
+            // check re-aims at them on the very next frame — the pump cooldown, not
+            // the aim delay, is his rate of fire within a magazine.
+            _nextShotAt = Time.time + shotCooldown;
+
             // Unity object: a destroyed one compares == null but is not a real null.
             if (shotFlash != null)
             {

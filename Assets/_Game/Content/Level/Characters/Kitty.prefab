@@ -1375,7 +1375,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Pets.PetVoice
   noticed: {fileID: 0}
   carried: {fileID: 0}
-  caught: {fileID: 0}
+  caught: {fileID: 8300000, guid: 00ec6851273d14e4c959244b2c5e0b11, type: 3}
   noiseLevel: 25
   cooldown: 3
   carriedInterval: 4

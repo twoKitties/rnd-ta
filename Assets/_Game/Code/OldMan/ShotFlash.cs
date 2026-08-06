@@ -1,15 +1,17 @@
+using FishNet;
 using FishNet.Object;
-using _Game.Code.App;
 using UnityEngine;
 
 namespace _Game.Code.OldMan
 {
     /// <summary>
-    /// Old Man firing, as seen and as felt: a light blinked for a few frames, the
-    /// recoil kick handed to <see cref="RifleAim"/>, and — since 2026-08-06 — the
-    /// <see cref="ShotPellet"/> grown from the muzzle, which is what carries the
-    /// kill now. All three ride this component's one RPC so firing travels once
-    /// (MECHANICS.md 5.2 and 5.6).
+    /// Old Man firing, as seen, heard and felt: a light blinked for a few frames,
+    /// the bang, the recoil kick handed to <see cref="RifleAim"/>, and — since
+    /// 2026-08-06 — the <see cref="ShotPellet"/> grown from the muzzle, which is
+    /// what carries the kill now. All of it rides this component's one RPC so
+    /// firing travels once (MECHANICS.md 5.2 and 5.6). The sound is the loudest
+    /// half of the show: the flash is over in 0.06 s and a victim facing away
+    /// misses it entirely.
     ///
     /// It is a component of its own, and a NetworkBehaviour, because
     /// <see cref="OldManBrain"/> runs on the server alone (ServerSimulated): a light
@@ -33,6 +35,21 @@ namespace _Game.Code.OldMan
                  "peer, armed only where the process decides deaths. Not optional — " +
                  "unwired, he fires blanks, and loudly says so.")]
         [SerializeField] private ShotPellet pelletPrefab;
+
+        [Header("Sound")]
+        [Tooltip("The shot. Its own source, not shared with the footsteps: it needs a " +
+                 "rolloff that carries across the level, and FootstepAudio rewrites the " +
+                 "source's pitch on every step.")]
+        [SerializeField] private AudioSource shotSource;
+
+        [SerializeField] private AudioClip shot;
+
+        // Whether this process decides deaths: the server, or a process with no
+        // networking at all. The same formula PlayerLife and LevelBootstrapper use —
+        // asked of the process, because the pellet is armed at launch, before it can
+        // know anything about spawn state.
+        private static bool DecidesHere =>
+            InstanceFinder.NetworkManager == null || !InstanceFinder.IsClientStarted || InstanceFinder.IsServerStarted;
 
         private float _offAt;
 
@@ -74,6 +91,16 @@ namespace _Game.Code.OldMan
 
         private void Blink()
         {
+            // The sound first, and on its own exit: it is the louder half of the show
+            // by far. The flash lasts 0.06 s and a victim facing away never sees it at
+            // all, so letting a missing Light take the shot's sound with it would
+            // silence the only feedback most deaths ever get.
+            // Unity objects: a destroyed one compares == null but is not a real null.
+            if (shotSource != null && shot != null)
+            {
+                shotSource.PlayOneShot(shot);
+            }
+
             // Before the kick: the pellet leaves along the aim, not the recoil throw.
             LaunchPellet();
 
@@ -118,7 +145,7 @@ namespace _Game.Code.OldMan
 
             var pellet = Instantiate(pelletPrefab);
             var boot = LevelBootstrapper.Current;
-            pellet.Launch(muzzle, direction, Authority.DecidesHere,
+            pellet.Launch(muzzle, direction, DecidesHere,
                 boot == null ? null : boot.SensedPlayers);
         }
 

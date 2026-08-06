@@ -260,8 +260,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba8216cf55984dd4c840b6f932b65395, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Pets.PetVoice
-  noticed: {fileID: 0}
-  carried: {fileID: 0}
+  noticed: {fileID: 8300000, guid: 85800c56dccbec64eb6983351570b473, type: 3}
+  carried: {fileID: 8300000, guid: eeb85d901a885fe40ae21afb3d03a3cb, type: 3}
   caught: {fileID: 0}
   noiseLevel: 25
   cooldown: 3

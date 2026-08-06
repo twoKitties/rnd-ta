@@ -42,8 +42,8 @@ namespace _Game.Code.OldMan
         private IReadOnlyList<SensedPlayer> _players;
 
         /// <summary>
-        /// Sends it on its way. Armed means this process decides deaths
-        /// (Authority.DecidesHere, passed in by ShotFlash); the player list is
+        /// Sends it on its way. Armed means this process decides deaths — the
+        /// server, or no networking at all, passed in by ShotFlash; the player list is
         /// LevelBootstrapper's live one, null on a peer that has none — which is
         /// only ever an unarmed one.
         /// </summary>

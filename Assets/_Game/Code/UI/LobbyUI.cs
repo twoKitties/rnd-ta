@@ -90,8 +90,17 @@ namespace _Game.Code.UI
         private LobbyRoster _roster;
         private RaidSession _session;
 
+        /// <summary>
+        /// The lobby while it is on screen. Read by <see cref="LoadingScreen"/> as "is
+        /// the main menu up" — SceneManager.sceneLoaded does not answer that, it never
+        /// fires for a scene FishNet skips as already loaded.
+        /// </summary>
+        public static LobbyUI Current { get; private set; }
+
         private void Awake()
         {
+            Current = this;
+
             _playButton.onClick.AddListener(OpenLobby);
             _settingsButton.onClick.AddListener(OpenSettings);
             _exitButton.onClick.AddListener(Exit);
@@ -132,23 +141,8 @@ namespace _Game.Code.UI
             // was saved at alpha 1 and the menu at 0, so the game opened on the lobby —
             // and, worse, every panel still blocked raycasts until the first switch, so
             // an invisible menu was catching clicks.
-            //
-            // Coming back from a raid through ReturnToLobby leaves the connection up, and
-            // the Host/Connect screen is unusable to a machine that is already in a
-            // session — Host would only fail on its own busy port. So a live session lands
-            // straight on the player list; the roster survives the scene load and the
-            // Update watcher below fills the rows in once it is noticed.
-            if (RaidSession.Active != null && InstanceFinder.IsClientStarted)
-            {
-                OpenLobby();
-                ShowStep(LobbyStep.Players);
-            }
-            else
-            {
-                OpenMainMenu();
-                ShowStep(LobbyStep.Options);
-            }
-
+            OpenMainMenu();
+            ShowStep(LobbyStep.Options);
             ClosePopup();
 
             // Same reason as the panel above: these two are authored visible in the
@@ -207,6 +201,11 @@ namespace _Game.Code.UI
 
             Unsubscribe();
             UnsubscribeSession();
+
+            if (Current == this)
+            {
+                Current = null;
+            }
         }
 
         // The roster is spawned by the host over the network, so it does not exist when

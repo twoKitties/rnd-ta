@@ -165,6 +165,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.App.Bootstrapper
   firstScene: Lobby
   sessionPrefab: {fileID: 4323903077379937797, guid: ecdea46fc2952f14cb0edf0f021619d1, type: 3}
+  loadingScreenPrefab: {fileID: 5025204626650797747, guid: e570a7feee6c2904eba9abfa54ab2e43, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

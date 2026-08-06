@@ -20,7 +20,10 @@ namespace _Game.Code.OldMan
         Aim,
 
         /// <summary>Walking to where he last saw someone, after a shot was cancelled.</summary>
-        Search
+        Search,
+
+        /// <summary>Standing still, refilling the magazine after his last shell.</summary>
+        Reload
     }
 
     /// <summary>
@@ -37,7 +40,10 @@ namespace _Game.Code.OldMan
     /// 2. The delay ran out and he can still see them → he fires. Since 2026-08-06
     ///    the shot is a pellet flown at a dodgeable speed, and death happens on
     ///    impact rather than on the trigger (5.2) — a sidestep after the bang is
-    ///    the second chance the aim delay used to be the only one of.
+    ///    the second chance the aim delay used to be the only one of. The gun
+    ///    holds two shells: after the second he stands where he is and reloads,
+    ///    and those seconds are the raid's window to break the line and run —
+    ///    being seen cannot re-aim him until the shells are in.
     /// 3. They broke the line first → the shot is cancelled and he walks to where he
     ///    last saw them, waits, and goes back to his round (5.4).
     /// 4. Otherwise, a noise at or above his threshold → he goes to the loudest one
@@ -85,6 +91,12 @@ namespace _Game.Code.OldMan
 
         [Tooltip("Between seeing a player and firing. The window the player can still escape in.")]
         [SerializeField] private float aimDelay = 0.4f;
+
+        [Tooltip("Shells between reloads. Emptied one per shot, refilled by a full reload.")]
+        [SerializeField] private int magazineSize = 2;
+
+        [Tooltip("Seconds he stands in place refilling the magazine. The raid's window to run.")]
+        [SerializeField] private float reloadTime = 3f;
 
         [Header("Doors (MECHANICS.md 5.5)")]
         [Tooltip("How close he must be to a leaf to pull it. Same reach the player has.")]
@@ -136,6 +148,8 @@ namespace _Game.Code.OldMan
         private int _patrolIndex;
         private float _waitLeft;
         private float _aimLeft;
+        private int _shellsLeft;
+        private float _reloadLeft;
         private float _repathAt;
         private float _doorWaitUntil;
 
@@ -166,7 +180,7 @@ namespace _Game.Code.OldMan
             _agent = GetComponent<NavMeshAgent>();
             _animator = GetComponent<Animator>();
             _path = new NavMeshPath();
-
+            _shellsLeft = magazineSize;
         }
 
         /// <summary>
@@ -214,7 +228,10 @@ namespace _Game.Code.OldMan
             var seen = NearestSeenPlayer();
             if (seen != null)
             {
-                if (State != OldManState.Aim)
+                // An empty gun cannot aim: while he reloads, being seen changes
+                // nothing but where he is looking — the spot keeps tracking, so
+                // the moment the shells are in he is already facing the threat.
+                if (State != OldManState.Aim && State != OldManState.Reload)
                 {
                     State = OldManState.Aim;
                     _aimLeft = aimDelay;
@@ -227,6 +244,10 @@ namespace _Game.Code.OldMan
             {
                 case OldManState.Aim:
                     TickAim(seen);
+                    break;
+
+                case OldManState.Reload:
+                    TickReload(seen);
                     break;
 
                 case OldManState.Search:
@@ -286,9 +307,52 @@ namespace _Game.Code.OldMan
 
             Debug.Log($"{name} fired (MECHANICS.md 5.2).");
 
+            _shellsLeft -= 1;
+            if (_shellsLeft <= 0)
+            {
+                EnterReload();
+                return;
+            }
+
             // Straight back to the round; a player still in view is picked up by the
             // sight check on the very next frame.
             EnterPatrol();
+        }
+
+        /// <summary>
+        /// Standing where the last shell left him, counting the magazine back in.
+        /// A player in view cannot be aimed at until it is full — that pause is the
+        /// mechanic, the one guaranteed window after two dodges — but he keeps
+        /// facing them, so surviving it reads as his gun's limit, not his blindness.
+        /// </summary>
+        private void TickReload(SensedPlayer seen)
+        {
+            Halt();
+
+            if (seen != null)
+            {
+                FaceTowards(_targetSpot);
+            }
+
+            _reloadLeft -= Time.deltaTime;
+            if (_reloadLeft > 0f)
+            {
+                return;
+            }
+
+            _shellsLeft = magazineSize;
+
+            // Through patrol rather than straight back to Aim: a player still in
+            // view is picked up by the sight check on the very next frame, and that
+            // path refills the aim delay — a fresh gun aims like a fresh sighting.
+            EnterPatrol();
+        }
+
+        private void EnterReload()
+        {
+            State = OldManState.Reload;
+            _reloadLeft = reloadTime;
+            Debug.Log($"{name} is reloading (MECHANICS.md 5.2).");
         }
 
         private void TickSearch()

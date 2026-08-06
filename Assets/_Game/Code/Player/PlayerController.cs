@@ -142,6 +142,13 @@ namespace _Game.Code.Player
 
         private void OnEnable()
         {
+            // A domain reload re-runs OnEnable on a live instance without re-running
+            // Awake, and _input is not serialized — the wrapper Awake made is gone.
+            if (_input == null)
+            {
+                _input = new InputSystem_Actions();
+            }
+
             _input.Player.Enable();
         }
 
@@ -162,7 +169,13 @@ namespace _Game.Code.Player
 
         private void OnDestroy()
         {
-            _input.Dispose();
+            // Null after a domain reload if this instance stayed disabled throughout
+            // (LocalAvatar keeps it off on every avatar but ours), so OnEnable never
+            // rebuilt it.
+            if (_input != null)
+            {
+                _input.Dispose();
+            }
         }
 
         private void Update()

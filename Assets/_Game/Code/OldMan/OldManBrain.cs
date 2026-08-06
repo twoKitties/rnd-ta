@@ -34,7 +34,10 @@ namespace _Game.Code.OldMan
     ///    already walking to (5.2). The delay before the shot is the whole point of
     ///    the mechanic: it is the window in which the player can still fix their
     ///    mistake, which is what makes death read as a mistake rather than bad luck.
-    /// 2. The delay ran out and he can still see them → they die (3.7).
+    /// 2. The delay ran out and he can still see them → he fires. Since 2026-08-06
+    ///    the shot is a pellet flown at a dodgeable speed, and death happens on
+    ///    impact rather than on the trigger (5.2) — a sidestep after the bang is
+    ///    the second chance the aim delay used to be the only one of.
     /// 3. They broke the line first → the shot is cancelled and he walks to where he
     ///    last saw them, waits, and goes back to his round (5.4).
     /// 4. Otherwise, a noise at or above his threshold → he goes to the loudest one
@@ -46,9 +49,10 @@ namespace _Game.Code.OldMan
     /// animals use to reject a route is what tells him which leaf to pull. That
     /// asymmetry is the whole of "only he and the players open doors".
     ///
-    /// There is no shooting animation — deliberately, and it is a decision rather
-    /// than a gap: the turn, the delay, the death, the flash and the log are the
-    /// mechanic, and a weapon pose belongs on its own animator layer in a later pass.
+    /// The shot itself is not this brain's business: ShotFlash blinks the light and
+    /// flies the pellet, RifleAim points the rifle and takes the kick (IK, no clips
+    /// — since 2026-08-06). They only read from here; the delay, the decision to
+    /// fire and the log stay the mechanic, but the death now belongs to the pellet.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
     public class OldManBrain : MonoBehaviour
@@ -106,9 +110,10 @@ namespace _Game.Code.OldMan
         [SerializeField] private LayerMask doorMask;
 
         [Header("Shot")]
-        [Tooltip("Shows the shot. Optional — without it the shot is the log alone. It " +
-                 "is a separate component because this brain runs on the server only, " +
-                 "and a flash lit here would be seen by nobody else.")]
+        [Tooltip("Delivers the shot: the blink, the kick and — since 2026-08-06 — the " +
+                 "pellet that carries the kill, so it is no longer optional. A separate " +
+                 "component because this brain runs on the server only, and anything " +
+                 "shown from here would be seen by nobody else.")]
         [SerializeField] private ShotFlash shotFlash;
 
         // Hashes, not state: nothing per-actor lives here (MECHANICS.md 7.3). The two
@@ -148,6 +153,13 @@ namespace _Game.Code.OldMan
 
         /// <summary>What he is doing. Read by measurements and by tests.</summary>
         public OldManState State { get; private set; } = OldManState.Patrol;
+
+        /// <summary>
+        /// Where he is going — while aiming, the victim's position, refreshed every
+        /// frame he can still see them. Read by <see cref="RifleAim"/> to point the
+        /// rifle; a read-only window, so the netcode stays out of the brain.
+        /// </summary>
+        public Vector3 TargetSpot => _targetSpot;
 
         private void Awake()
         {
@@ -250,24 +262,32 @@ namespace _Game.Code.OldMan
                 return;
             }
 
-            Shoot(seen);
+            Shoot();
         }
 
-        private void Shoot(SensedPlayer target)
+        private void Shoot()
         {
-            target.Kill();
-
+            // The kill left this method on 2026-08-06: ShotFlash grows a ShotPellet
+            // from the muzzle on every peer, and death happens where it lands (5.2).
+            // A dodged pellet leaves the victim alive and in view, so the sight
+            // check re-aims at them on the very next frame — the aim delay doubles
+            // as his rate of fire.
+            //
             // Unity object: a destroyed one compares == null but is not a real null.
             if (shotFlash != null)
             {
                 shotFlash.Fire();
             }
+            else
+            {
+                // Loud: with the kill riding the pellet, no flash means firing blanks.
+                Debug.LogError($"{name}: no ShotFlash wired, the shot can hit nobody (MECHANICS.md 5.2).");
+            }
 
-            Debug.Log($"{name} fired (MECHANICS.md 5.2). No shooting animation yet: flash and log only.");
+            Debug.Log($"{name} fired (MECHANICS.md 5.2).");
 
-            // Straight back to the round. He does not need to search for someone he
-            // just shot, and a second player still in view is picked up by the sight
-            // check on the very next frame.
+            // Straight back to the round; a player still in view is picked up by the
+            // sight check on the very next frame.
             EnterPatrol();
         }
 

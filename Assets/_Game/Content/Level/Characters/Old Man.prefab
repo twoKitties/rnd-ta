@@ -151,7 +151,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 511650386055069369}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000040745, y: -0.00015546696, z: -0.0019997861, w: 0.999998}
+  m_LocalRotation: {x: -0.00000040745002, y: -0.00015546696, z: -0.0019997864, w: 0.999998}
   m_LocalPosition: {x: 0.00001632946, y: 0.030745342, z: -0.00000010284313}
   m_LocalScale: {x: 0.99999994, y: 1, z: 0.99999994}
   m_ConstrainProportionsScale: 1
@@ -245,7 +245,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 646529770385512202}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.0041641863, y: 0.009516319, z: 0.05700694, w: 0.99831975}
+  m_LocalRotation: {x: -0.004164187, y: 0.009516319, z: 0.057006944, w: 0.99831975}
   m_LocalPosition: {x: -0.012572389, y: 0.10987278, z: -0.00082166976}
   m_LocalScale: {x: 1, y: 0.9999999, z: 1}
   m_ConstrainProportionsScale: 1
@@ -343,11 +343,11 @@ Transform:
   m_GameObject: {fileID: 863211304079033049}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.25, y: 1.35, z: 0.35}
+  m_LocalPosition: {x: -1.1, y: 0.05, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7394324716537566361}
+  m_Father: {fileID: 6651582023274082426}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!108 &5071351565010985022
 Light:
@@ -812,6 +812,7 @@ GameObject:
   - component: {fileID: 8597881750601158075}
   - component: {fileID: 7599721475431835561}
   - component: {fileID: 5461600115069761610}
+  - component: {fileID: 2957613029062431566}
   m_Layer: 0
   m_Name: Old Man
   m_TagString: Untagged
@@ -835,7 +836,6 @@ Transform:
   - {fileID: 183498884651563623}
   - {fileID: 4928269705706154862}
   - {fileID: 6651582023274082426}
-  - {fileID: 5438775359308132362}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &2112313865116568199
@@ -848,7 +848,7 @@ Animator:
   m_GameObject: {fileID: 3706920364051464488}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: fe10a2847977ad94aa21d82c6f6e89e7, type: 3}
-  m_Controller: {fileID: 9100000, guid: 574d17ea6b048fb4ea8452b768de47f3, type: 2}
+  m_Controller: {fileID: 9100000, guid: 5745463e22621cb48ac343893ce4f430, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1075,6 +1075,37 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 0}
   flash: {fileID: 5071351565010985022}
   flashTime: 0.06
+  rifleAim: {fileID: 2957613029062431566}
+  pelletPrefab: {fileID: 6923674218120238294, guid: 6e6d5e30e5654f541a4ff56417832222, type: 3}
+--- !u!114 &2957613029062431566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3706920364051464488}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10698367c94f1cb468fe5e630a06e955, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.OldMan.RifleAim
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 8169274461671871203}
+  _networkObjectCache: {fileID: 0}
+  brain: {fileID: 3120213650661026982}
+  rifle: {fileID: 6651582023274082426}
+  shoulderOffset: {x: 0.18, y: 1.35, z: 0.08}
+  aimHeight: 0.25
+  stockGrip: {x: 0.02, y: -0.04, z: 0}
+  foreGrip: {x: -0.32, y: -0.04, z: 0}
+  rightHandEuler: {x: 0, y: 0, z: -90}
+  leftHandEuler: {x: 0, y: 0, z: 90}
+  blendTime: 0.15
+  recoilTime: 0.25
+  recoilKick: 0.12
+  recoilPitch: 12
+  bodyLook: 0.4
+  headLook: 0.9
 --- !u!1 &3871579535469855889
 GameObject:
   m_ObjectHideFlags: 0
@@ -2699,7 +2730,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 5764194565774824882, guid: bb2e5a07478efea4caf20fe3d845a08b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5438775359308132362}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bb2e5a07478efea4caf20fe3d845a08b, type: 3}
 --- !u!4 &6651582023274082426 stripped

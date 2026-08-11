@@ -120,7 +120,8 @@ Worth knowing:
 
 These are load-bearing. Keep them in force even when the task is small.
 
-- **Don't commit stuff to git.** User can make a commit on his own after they check out your work
+- **Don't commit stuff to git.** User can make a commit on his own after they check out your work.
+- **Don't write extensive comments in code** Use short technical vocabulary and use it only in places where those commentaries are absolutly necessary for understanding code. if a method is called GetPlayersCount and returns players count - it's obvious what it does. Only some hardcoded complicated logic requires descriptions on how it works.
 - **Do exactly what's asked — then stop and report.** Not a partial version, not a souped-up version with extra "fixes", restarts, or refactors that weren't requested. If ambiguous, ask instead of assuming.
 - **Never guess or speculate.** Don't theorize about what the code does or why something breaks — open the file and verify. For tuned systems, where the behaviour comes from the numbers rather than the structure, this is the whole job: read the actual values and the comments around them before changing a tunable, and change one at a time.
 - **Never lie or invent.** If you don't know something, say so. When your tools or knowledge aren't enough to finish the task, stop and tell the user exactly what you're missing and what you need from them (a file, a credential, a decision, editor access). If the gap is factual or external (an API, a Unity/C# detail, a package behaviour), use web search to find a real source rather than answering from memory — and cite it.

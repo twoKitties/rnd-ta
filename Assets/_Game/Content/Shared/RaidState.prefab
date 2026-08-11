@@ -46,9 +46,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a1f991ab7bc91447acaf1306497ba1c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Level.RaidState
-  _componentIndexCache: 255
+  _componentIndexCache: 0
   _addedNetworkObject: {fileID: 1879950753132112940}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 1879950753132112940}
 --- !u!114 &1879950753132112940
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -79,22 +79,24 @@ MonoBehaviour:
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 65535
+  <PrefabId>k__BackingField: 3
   <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 4272908729461604148
+  <AssetPathHash>k__BackingField: 3737176005065714964
   SceneId: 0
   SerializedTransformProperties:
     Position: {x: 0, y: 0, z: 0}
-    Rotation: {x: 0, y: 0, z: 0, w: 0}
-    Scale: {x: 0, y: 0, z: 0}
-    IsValid: 0
+    Rotation: {x: 0, y: 0, z: 0, w: 1}
+    Scale: {x: 1, y: 1, z: 1}
+    IsValid: 1
   <IsNested>k__BackingField: 0
   WasActiveDuringEdit: 0
   WasActiveDuringEdit_Set1: 1
   <ComponentIndex>k__BackingField: 0
   <PredictedSpawn>k__BackingField: {fileID: 0}
   <PredictedOwner>k__BackingField: {fileID: 0}
-  NetworkBehaviours: []
+  NetworkBehaviours:
+  - {fileID: 8281743243317466243}
+  - {fileID: 2512202078275834293}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects: []
   RuntimeParentNetworkBehaviour: {fileID: 0}
@@ -105,7 +107,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: 0
+  _initializedTimestamp: -8584151836841413246
 --- !u!114 &2512202078275834293
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -118,6 +120,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ca9ce3a0f026a34fa7d6ed732714652, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.Doors.DoorState
-  _componentIndexCache: 255
+  _componentIndexCache: 1
   _addedNetworkObject: {fileID: 1879950753132112940}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 1879950753132112940}

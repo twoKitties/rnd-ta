@@ -157,9 +157,11 @@ namespace _Game.Code.AI
         }
 
         /// <summary>
-        /// Shot by Old Man: instant death, no respawn (MECHANICS.md 5.2 and 3.7).
-        /// Routed through here so his brain never reaches for a component on somebody
-        /// else's avatar, and does nothing to an avatar with no PlayerLife.
+        /// Hit by Old Man's pellet: death, no respawn (MECHANICS.md 5.2 and 3.7 —
+        /// since 2026-08-06 the shot flies and can be dodged, so this is called on
+        /// impact rather than on the trigger). Routed through here so the shot never
+        /// reaches for a component on somebody else's avatar, and does nothing to an
+        /// avatar with no PlayerLife.
         ///
         /// Under 7.4 this is the host's decision — a client does not decide it was
         /// seen — and PlayerLife.Kill is already idempotent, so a confirmation

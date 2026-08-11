@@ -20,7 +20,10 @@ namespace _Game.Code.OldMan
         Aim,
 
         /// <summary>Walking to where he last saw someone, after a shot was cancelled.</summary>
-        Search
+        Search,
+
+        /// <summary>Standing still, refilling the magazine after his last shell.</summary>
+        Reload
     }
 
     /// <summary>
@@ -34,7 +37,13 @@ namespace _Game.Code.OldMan
     ///    already walking to (5.2). The delay before the shot is the whole point of
     ///    the mechanic: it is the window in which the player can still fix their
     ///    mistake, which is what makes death read as a mistake rather than bad luck.
-    /// 2. The delay ran out and he can still see them → they die (3.7).
+    /// 2. The delay ran out and he can still see them → he fires. Since 2026-08-06
+    ///    the shot is a pellet flown at a dodgeable speed, and death happens on
+    ///    impact rather than on the trigger (5.2) — a sidestep after the bang is
+    ///    the second chance the aim delay used to be the only one of. The gun
+    ///    holds two shells: after the second he stands where he is and reloads,
+    ///    and those seconds are the raid's window to break the line and run —
+    ///    being seen cannot re-aim him until the shells are in.
     /// 3. They broke the line first → the shot is cancelled and he walks to where he
     ///    last saw them, waits, and goes back to his round (5.4).
     /// 4. Otherwise, a noise at or above his threshold → he goes to the loudest one
@@ -46,9 +55,10 @@ namespace _Game.Code.OldMan
     /// animals use to reject a route is what tells him which leaf to pull. That
     /// asymmetry is the whole of "only he and the players open doors".
     ///
-    /// There is no shooting animation — deliberately, and it is a decision rather
-    /// than a gap: the turn, the delay, the death, the flash and the log are the
-    /// mechanic, and a weapon pose belongs on its own animator layer in a later pass.
+    /// The shot itself is not this brain's business: ShotFlash blinks the light and
+    /// flies the pellet, RifleAim points the rifle and takes the kick (IK, no clips
+    /// — since 2026-08-06). They only read from here; the delay, the decision to
+    /// fire and the log stay the mechanic, but the death now belongs to the pellet.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
     public class OldManBrain : MonoBehaviour
@@ -82,7 +92,13 @@ namespace _Game.Code.OldMan
         [Tooltip("Between seeing a player and firing. The window the player can still escape in.")]
         [SerializeField] private float aimDelay = 0.4f;
 
-        [Tooltip("Shortest gap between two shots, s — he is reloading a shotgun. Without " +
+        [Tooltip("Shells between reloads. Emptied one per shot, refilled by a full reload.")]
+        [SerializeField] private int magazineSize = 2;
+
+        [Tooltip("Seconds he stands in place refilling the magazine. The raid's window to run.")]
+        [SerializeField] private float reloadTime = 3f;
+
+        [Tooltip("Shortest gap between two shells, s — the pump between shots. Without " +
                  "it the only gap is the aim delay, so a second player in the room dies " +
                  "0.4 s after the first (MECHANICS.md section 2).")]
         [SerializeField] private float shotCooldown = 2f;
@@ -111,9 +127,10 @@ namespace _Game.Code.OldMan
         [SerializeField] private LayerMask doorMask;
 
         [Header("Shot")]
-        [Tooltip("Shows the shot. Optional — without it the shot is the log alone. It " +
-                 "is a separate component because this brain runs on the server only, " +
-                 "and a flash lit here would be seen by nobody else.")]
+        [Tooltip("Delivers the shot: the blink, the kick and — since 2026-08-06 — the " +
+                 "pellet that carries the kill, so it is no longer optional. A separate " +
+                 "component because this brain runs on the server only, and anything " +
+                 "shown from here would be seen by nobody else.")]
         [SerializeField] private ShotFlash shotFlash;
 
         // Hashes, not state: nothing per-actor lives here (MECHANICS.md 7.3). The two
@@ -136,9 +153,12 @@ namespace _Game.Code.OldMan
         private int _patrolIndex;
         private float _waitLeft;
         private float _aimLeft;
+        private int _shellsLeft;
+        private float _reloadLeft;
 
-        // When the gun is loaded again. Absolute time rather than a countdown, so it
-        // survives him leaving Aim and coming back — which he does after every shot.
+        // When the pump has cycled and the gun can fire again. Absolute time rather
+        // than a countdown, so it survives him leaving Aim and coming back — which
+        // he does after every shot.
         private float _nextShotAt;
         private float _repathAt;
         private float _doorWaitUntil;
@@ -158,12 +178,19 @@ namespace _Game.Code.OldMan
         /// <summary>What he is doing. Read by measurements and by tests.</summary>
         public OldManState State { get; private set; } = OldManState.Patrol;
 
+        /// <summary>
+        /// Where he is going — while aiming, the victim's position, refreshed every
+        /// frame he can still see them. Read by <see cref="RifleAim"/> to point the
+        /// rifle; a read-only window, so the netcode stays out of the brain.
+        /// </summary>
+        public Vector3 TargetSpot => _targetSpot;
+
         private void Awake()
         {
             _agent = GetComponent<NavMeshAgent>();
             _animator = GetComponent<Animator>();
             _path = new NavMeshPath();
-
+            _shellsLeft = magazineSize;
         }
 
         /// <summary>
@@ -211,7 +238,10 @@ namespace _Game.Code.OldMan
             var seen = NearestSeenPlayer();
             if (seen != null)
             {
-                if (State != OldManState.Aim)
+                // An empty gun cannot aim: while he reloads, being seen changes
+                // nothing but where he is looking — the spot keeps tracking, so
+                // the moment the shells are in he is already facing the threat.
+                if (State != OldManState.Aim && State != OldManState.Reload)
                 {
                     State = OldManState.Aim;
                     _aimLeft = aimDelay;
@@ -224,6 +254,10 @@ namespace _Game.Code.OldMan
             {
                 case OldManState.Aim:
                     TickAim(seen);
+                    break;
+
+                case OldManState.Reload:
+                    TickReload(seen);
                     break;
 
                 case OldManState.Search:
@@ -259,37 +293,87 @@ namespace _Game.Code.OldMan
                 return;
             }
 
-            // Reloading. He keeps the target lined up — Halt and FaceTowards above run
+            // The pump. He keeps the target lined up — Halt and FaceTowards above run
             // every frame, and Think keeps refreshing _targetSpot while the player is
-            // visible — so this is a man with you in his sights and an empty barrel, not
-            // a man who has forgotten you. Break his line of sight during it and the
-            // branch above cancels the shot exactly as it does during the aim delay.
+            // visible — so this is a man with you in his sights and a spent chamber,
+            // not a man who has forgotten you. Break his line of sight during it and
+            // the branch above cancels the shot exactly as it does during the aim delay.
             if (Time.time < _nextShotAt)
             {
                 return;
             }
 
-            Shoot(seen);
+            Shoot();
         }
 
-        private void Shoot(SensedPlayer target)
+        private void Shoot()
         {
+            // The kill left this method on 2026-08-06: ShotFlash grows a ShotPellet
+            // from the muzzle on every peer, and death happens where it lands (5.2).
+            // A dodged pellet leaves the victim alive and in view, so the sight
+            // check re-aims at them on the very next frame — the pump cooldown, not
+            // the aim delay, is his rate of fire within a magazine.
             _nextShotAt = Time.time + shotCooldown;
-
-            target.Kill();
 
             // Unity object: a destroyed one compares == null but is not a real null.
             if (shotFlash != null)
             {
                 shotFlash.Fire();
             }
+            else
+            {
+                // Loud: with the kill riding the pellet, no flash means firing blanks.
+                Debug.LogError($"{name}: no ShotFlash wired, the shot can hit nobody (MECHANICS.md 5.2).");
+            }
 
-            Debug.Log($"{name} fired (MECHANICS.md 5.2). No shooting animation yet: flash and log only.");
+            Debug.Log($"{name} fired (MECHANICS.md 5.2).");
 
-            // Straight back to the round. He does not need to search for someone he
-            // just shot, and a second player still in view is picked up by the sight
-            // check on the very next frame.
+            _shellsLeft -= 1;
+            if (_shellsLeft <= 0)
+            {
+                EnterReload();
+                return;
+            }
+
+            // Straight back to the round; a player still in view is picked up by the
+            // sight check on the very next frame.
             EnterPatrol();
+        }
+
+        /// <summary>
+        /// Standing where the last shell left him, counting the magazine back in.
+        /// A player in view cannot be aimed at until it is full — that pause is the
+        /// mechanic, the one guaranteed window after two dodges — but he keeps
+        /// facing them, so surviving it reads as his gun's limit, not his blindness.
+        /// </summary>
+        private void TickReload(SensedPlayer seen)
+        {
+            Halt();
+
+            if (seen != null)
+            {
+                FaceTowards(_targetSpot);
+            }
+
+            _reloadLeft -= Time.deltaTime;
+            if (_reloadLeft > 0f)
+            {
+                return;
+            }
+
+            _shellsLeft = magazineSize;
+
+            // Through patrol rather than straight back to Aim: a player still in
+            // view is picked up by the sight check on the very next frame, and that
+            // path refills the aim delay — a fresh gun aims like a fresh sighting.
+            EnterPatrol();
+        }
+
+        private void EnterReload()
+        {
+            State = OldManState.Reload;
+            _reloadLeft = reloadTime;
+            Debug.Log($"{name} is reloading (MECHANICS.md 5.2).");
         }
 
         private void TickSearch()

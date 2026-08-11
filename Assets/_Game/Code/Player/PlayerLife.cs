@@ -7,8 +7,8 @@ using UnityEngine;
 namespace _Game.Code.Player
 {
     /// <summary>
-    /// Whether this avatar is still alive, and what dying does to it. Old Man's shot
-    /// kills instantly and there is no respawn (MECHANICS.md 3.7): the player becomes
+    /// Whether this avatar is still alive, and what dying does to it. Old Man's pellet
+    /// kills on impact and there is no respawn (MECHANICS.md 3.7): the player becomes
     /// a spectator, so the avatar keeps its camera and its HUD and loses everything
     /// else.
     ///

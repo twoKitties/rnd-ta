@@ -6,7 +6,7 @@ namespace _Game.Code.OldMan
 {
     /// <summary>
     /// Old Man firing, as seen, heard and felt: a light blinked for a few frames,
-    /// the bang, the recoil kick handed to <see cref="RifleAim"/>, and — since
+    /// the bang, the recoil kick handed to <see cref="RifleRig"/>, and — since
     /// 2026-08-06 — the <see cref="ShotPellet"/> grown from the muzzle, which is
     /// what carries the kill now. All of it rides this component's one RPC so
     /// firing travels once (MECHANICS.md 5.2 and 5.6). The sound is the loudest
@@ -29,7 +29,7 @@ namespace _Game.Code.OldMan
 
         [Tooltip("Kicked when the flash blinks, so the recoil rides the same RPC. " +
                  "Also where the pellet's aim is read from — see below.")]
-        [SerializeField] private RifleAim rifleAim;
+        [SerializeField] private RifleRig rifleAim;
 
         [Tooltip("The shot itself since 2026-08-06: grown from the muzzle on every " +
                  "peer, armed only where the process decides deaths. Not optional — " +
@@ -121,7 +121,7 @@ namespace _Game.Code.OldMan
 
         /// <summary>
         /// The muzzle is the flash's own transform — it hangs on the barrel tip and
-        /// travels with the raised rifle — and the aim is RifleAim's synced point,
+        /// travels with the raised rifle — and the aim is RifleRig's synced point,
         /// so every peer computes the same line without a byte added to the RPC.
         /// </summary>
         private void LaunchPellet()

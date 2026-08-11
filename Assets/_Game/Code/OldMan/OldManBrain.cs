@@ -56,7 +56,7 @@ namespace _Game.Code.OldMan
     /// asymmetry is the whole of "only he and the players open doors".
     ///
     /// The shot itself is not this brain's business: ShotFlash blinks the light and
-    /// flies the pellet, RifleAim points the rifle and takes the kick (IK, no clips
+    /// flies the pellet, RifleRig holds and points the rifle and takes the kick (IK, no clips
     /// — since 2026-08-06). They only read from here; the delay, the decision to
     /// fire and the log stay the mechanic, but the death now belongs to the pellet.
     /// </summary>
@@ -180,7 +180,7 @@ namespace _Game.Code.OldMan
 
         /// <summary>
         /// Where he is going — while aiming, the victim's position, refreshed every
-        /// frame he can still see them. Read by <see cref="RifleAim"/> to point the
+        /// frame he can still see them. Read by <see cref="RifleRig"/> to point the
         /// rifle; a read-only window, so the netcode stays out of the brain.
         /// </summary>
         public Vector3 TargetSpot => _targetSpot;

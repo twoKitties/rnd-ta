@@ -5,32 +5,53 @@ using UnityEngine;
 namespace _Game.Code.OldMan
 {
     /// <summary>
-    /// The shooting animation, built from IK rather than clips: the project owns no
-    /// weapon clip at all (MECHANICS.md 5.6), and a clip could not track the victim
-    /// anyway. While the brain aims, the rifle is raised from its authored hip-carry
-    /// to a shouldered frame pointed at the target, both hands are pinned onto it
-    /// with the humanoid IK pass, and the head and chest lean onto the same line;
-    /// the shot itself is a decaying kick folded into that frame. When he is not
-    /// aiming the weight blends to zero and the vendor animation runs untouched.
+    /// Old Man's rifle, built from IK rather than clips: the project owns no weapon
+    /// clip at all (MECHANICS.md 5.6), and a clip could not track the victim anyway.
+    ///
+    /// Two frames and one blend between them. The <em>carry</em> frame is the low
+    /// ready he walks his whole round in — barrel forward and down, both hands on
+    /// the gun — hung off the chest bone so it rides the torso's bob; the <em>aim</em>
+    /// frame is the shouldered pose pointed at the target, in root space so the
+    /// look-at's own spine rotation cannot feed back into it. Both hands are pinned
+    /// by the humanoid IK pass in both, which is what stops the vendor clips
+    /// swinging two empty arms next to a floating rifle (fixed 2026-08-11); only the
+    /// head and chest lean is faded in with the aim. The shot is a decaying kick
+    /// folded into the aim frame.
     ///
     /// The rifle stays a child of the root and is <em>placed</em> each LateUpdate,
-    /// the same idiom as the carried pet on the player. It is not parented to a
-    /// hand, so at weight zero the authored rest pose is restored exactly.
+    /// the same idiom as the carried pet on the player. The authored transform is
+    /// now only a rest pose for the disabled component.
     ///
     /// A NetworkBehaviour for the same reason as <see cref="ShotFlash"/>: the brain
     /// runs on the server alone, so "he is aiming, at this point" must travel or
-    /// only the host would see him shoulder the gun. Two SyncVars carry it; the
-    /// kick arrives through ShotFlash's existing every-peer blink, so firing adds
-    /// no second RPC. Off the network the brain is read directly — a level played
-    /// on its own keeps working, the Door.Use idiom.
+    /// only the host would see him shoulder the gun. Carry needs no wire of its own
+    /// — it is what every peer does when the aim flag is false. The kick arrives
+    /// through ShotFlash's existing every-peer blink, so firing adds no second RPC.
+    /// Off the network the brain is read directly — a level played on its own keeps
+    /// working, the Door.Use idiom.
     /// </summary>
-    public class RifleAim : NetworkBehaviour
+    public class RifleRig : NetworkBehaviour
     {
         [Tooltip("Read where the process simulates him; never read on a client.")]
         [SerializeField] private OldManBrain brain;
 
         [Tooltip("The rifle leaf under the prefab root. Placed, never reparented.")]
         [SerializeField] private Transform rifle;
+
+        [Header("Carry frame")]
+        [Tooltip("Butt of the stock at low ready, relative to the chest bone's position, " +
+                 "in his root space. His root scale is 1.")]
+        [SerializeField] private Vector3 carryOffset = new Vector3(0f, 0.02f, 0.04f);
+
+        [Tooltip("Barrel below horizontal while carried, degrees.")]
+        [SerializeField] private float carryPitch = 20f;
+
+        // Negative, and it has to be: this rig's arms reach 0.465 m from the shoulder
+        // while the grips are 0.34 m apart on a 1.14 m rifle, so a barrel pointed
+        // straight ahead puts the foregrip 0.8 m from the left shoulder and the arm
+        // tears off the gun. Across the body it lands at 0.42. Measured 2026-08-11.
+        [Tooltip("Barrel across the body while carried, degrees. Negative points it left.")]
+        [SerializeField] private float carryYaw = -30f;
 
         [Header("Aim frame")]
         [Tooltip("Butt of the stock while shouldered, in his root space. His root scale is 1.")]
@@ -49,8 +70,8 @@ namespace _Game.Code.OldMan
         [SerializeField] private Vector3 leftHandEuler = new Vector3(0f, 0f, 90f);
 
         [Header("Blending")]
-        [Tooltip("Seconds to raise or lower the rifle. Shorter than the 0.4 s aim delay, " +
-                 "so the victim sees the barrel settle on them before it fires.")]
+        [Tooltip("Seconds to raise or lower the rifle between carry and aim. Shorter than " +
+                 "the 0.4 s aim delay, so the victim sees the barrel settle on them before it fires.")]
         [SerializeField] private float blendTime = 0.15f;
 
         [Header("Recoil")]
@@ -75,6 +96,7 @@ namespace _Game.Code.OldMan
 
         private NetworkObject _nob;
         private Animator _animator;
+        private Transform _chest;
 
         private Vector3 _restPosition;
         private Quaternion _restRotation;
@@ -136,7 +158,7 @@ namespace _Game.Code.OldMan
                 if (spawned)
                 {
                     // SyncVars send on change only, and the point matters only while
-                    // aiming — a stale one is never read at weight zero.
+                    // aiming — a stale one is never read at the carry frame.
                     _aiming.Value = _wantAim;
                     if (_wantAim)
                     {
@@ -159,22 +181,20 @@ namespace _Game.Code.OldMan
         // prefab runs on the project's copy of the vendor controller, not the vendor's.
         private void OnAnimatorIK(int layerIndex)
         {
-            if (_weight <= 0f)
-            {
-                _animator.SetLookAtWeight(0f);
-                _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
-                _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
-                _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
-                _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
-                return;
-            }
-
             Vector3 riflePosition;
             Quaternion rifleRotation;
-            ComputeFrame(out riflePosition, out rifleRotation);
+            Pose(out riflePosition, out rifleRotation);
 
-            _animator.SetLookAtPosition(_point);
-            _animator.SetLookAtWeight(_weight, bodyLook, headLook, 0f, 0.5f);
+            // Only the lean is faded: the hands are on the gun at carry too.
+            if (_weight > 0f)
+            {
+                _animator.SetLookAtPosition(_point);
+                _animator.SetLookAtWeight(_weight, bodyLook, headLook, 0f, 0.5f);
+            }
+            else
+            {
+                _animator.SetLookAtWeight(0f);
+            }
 
             PinHand(AvatarIKGoal.RightHand, riflePosition, rifleRotation, stockGrip, rightHandEuler);
             PinHand(AvatarIKGoal.LeftHand, riflePosition, rifleRotation, foreGrip, leftHandEuler);
@@ -185,8 +205,8 @@ namespace _Game.Code.OldMan
         {
             _animator.SetIKPosition(hand, riflePosition + rifleRotation * grip);
             _animator.SetIKRotation(hand, rifleRotation * Quaternion.Euler(wristEuler));
-            _animator.SetIKPositionWeight(hand, _weight);
-            _animator.SetIKRotationWeight(hand, _weight);
+            _animator.SetIKPositionWeight(hand, 1f);
+            _animator.SetIKRotationWeight(hand, 1f);
         }
 
         // After the animator, so the rifle lands on the frame the hands were pinned
@@ -198,39 +218,78 @@ namespace _Game.Code.OldMan
                 return;
             }
 
+            Vector3 position;
+            Quaternion rotation;
+            Pose(out position, out rotation);
+
+            rifle.SetPositionAndRotation(position, rotation);
+            _riflePlaced = true;
+        }
+
+        // Whatever moves it puts it back. The rig never returns to the authored pose
+        // in play — it is where the prefab draws the rifle, not a state he is ever in.
+        private void OnDisable()
+        {
+            if (rifle == null || !_riflePlaced)
+            {
+                return;
+            }
+
+            rifle.localPosition = _restPosition;
+            rifle.localRotation = _restRotation;
+            _riflePlaced = false;
+        }
+
+        /// <summary>
+        /// The rifle's pose this frame — the carry lifted towards the aim by the blend
+        /// weight. One formula for both passes (IK, LateUpdate) and every peer, so the
+        /// hands and the gun cannot disagree.
+        /// </summary>
+        private void Pose(out Vector3 position, out Quaternion rotation)
+        {
+            Vector3 carryPosition;
+            Quaternion carryRotation;
+            CarryFrame(out carryPosition, out carryRotation);
+
             if (_weight <= 0f)
             {
-                // Put back exactly what was authored, once, then stop touching it.
-                if (_riflePlaced)
-                {
-                    rifle.localPosition = _restPosition;
-                    rifle.localRotation = _restRotation;
-                    _riflePlaced = false;
-                }
-
+                position = carryPosition;
+                rotation = carryRotation;
                 return;
             }
 
             Vector3 aimPosition;
             Quaternion aimRotation;
-            ComputeFrame(out aimPosition, out aimRotation);
+            AimFrame(out aimPosition, out aimRotation);
 
-            var parent = rifle.parent;
-            var restPosition = parent.TransformPoint(_restPosition);
-            var restRotation = parent.rotation * _restRotation;
-
-            rifle.SetPositionAndRotation(
-                Vector3.Lerp(restPosition, aimPosition, _weight),
-                Quaternion.Slerp(restRotation, aimRotation, _weight));
-            _riflePlaced = true;
+            position = Vector3.Lerp(carryPosition, aimPosition, _weight);
+            rotation = Quaternion.Slerp(carryRotation, aimRotation, _weight);
         }
 
-        /// <summary>
-        /// One formula produces the rifle's aimed pose and, through the grips, both
-        /// hand targets — depending only on the root transform, the synced point and
-        /// the kick, so every peer and both passes (IK, LateUpdate) agree.
-        /// </summary>
-        private void ComputeFrame(out Vector3 position, out Quaternion rotation)
+        // Low ready: the origin rides the chest so the gun bobs with him, the direction
+        // stays in root space — taking the chest's rotation too would let the spine's
+        // own animation wave the barrel about.
+        private void CarryFrame(out Vector3 position, out Quaternion rotation)
+        {
+            // Resolved on use, not in Awake: the Animator may not have built its
+            // humanoid mapping yet by then, and a null cached there would leave him
+            // carrying the gun off the fallback point for the whole raid.
+            if (_chest == null && _animator != null)
+            {
+                _chest = _animator.GetBoneTransform(HumanBodyBones.Chest);
+            }
+
+            var chest = _chest != null
+                ? _chest.position
+                : transform.TransformPoint(new Vector3(0f, shoulderOffset.y, 0f));
+
+            var origin = chest + transform.rotation * carryOffset;
+            var direction = transform.rotation * Quaternion.Euler(carryPitch, carryYaw, 0f) * Vector3.forward;
+
+            FrameFrom(origin, direction, out position, out rotation);
+        }
+
+        private void AimFrame(out Vector3 position, out Quaternion rotation)
         {
             var origin = transform.TransformPoint(shoulderOffset);
 
@@ -250,10 +309,19 @@ namespace _Game.Code.OldMan
                 direction = Quaternion.AngleAxis(-recoilPitch * _recoil, right) * direction;
             }
 
+            FrameFrom(origin, direction, out position, out rotation);
+            position -= direction * (recoilKick * _recoil);
+        }
+
+        // The stock grip lands on the origin in both frames, so the right hand holds
+        // the same point of the weapon whether it is carried or shouldered.
+        private void FrameFrom(Vector3 origin, Vector3 direction, out Vector3 position,
+            out Quaternion rotation)
+        {
             // The mesh's barrel runs down -X, so the same +90° yaw the rest pose
             // carries maps it onto the aim direction.
             rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(0f, 90f, 0f);
-            position = origin - rotation * stockGrip - direction * (recoilKick * _recoil);
+            position = origin - rotation * stockGrip;
         }
     }
 }

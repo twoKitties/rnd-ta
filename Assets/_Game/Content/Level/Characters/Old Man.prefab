@@ -906,6 +906,9 @@ MonoBehaviour:
   patrolWait: 2
   alertWait: 4
   aimDelay: 0.4
+  magazineSize: 2
+  reloadTime: 3
+  shotCooldown: 2
   doorReach: 1.5
   doorSwingTime: 0.5
   pathProbeHeight: 0.5
@@ -1082,6 +1085,38 @@ MonoBehaviour:
   pelletPrefab: {fileID: 6923674218120238294, guid: 6e6d5e30e5654f541a4ff56417832222, type: 3}
   shotSource: {fileID: 4238423098867907284}
   shot: {fileID: 8300000, guid: 3e6eb4de5cac1ca4a80b7f17a6e3b47b, type: 3}
+--- !u!114 &2957613029062431566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3706920364051464488}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10698367c94f1cb468fe5e630a06e955, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.OldMan.RifleAim
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 8169274461671871203}
+  _networkObjectCache: {fileID: 0}
+  brain: {fileID: 3120213650661026982}
+  rifle: {fileID: 6651582023274082426}
+  carryOffset: {x: 0, y: 0.02, z: 0.04}
+  carryPitch: 20
+  carryYaw: -30
+  shoulderOffset: {x: 0.18, y: 1.35, z: 0.08}
+  aimHeight: 0.25
+  stockGrip: {x: 0.02, y: -0.04, z: 0}
+  foreGrip: {x: -0.32, y: -0.04, z: 0}
+  rightHandEuler: {x: 0, y: 0, z: -90}
+  leftHandEuler: {x: 0, y: 0, z: 90}
+  blendTime: 0.15
+  recoilTime: 0.25
+  recoilKick: 0.12
+  recoilPitch: 12
+  bodyLook: 0.4
+  headLook: 0.9
 --- !u!82 &4238423098867907284
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1302,35 +1337,6 @@ MonoBehaviour:
   walkVolume: 0.42
   sprintVolume: 1
   pitchJitter: 0.06
---- !u!114 &2957613029062431566
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3706920364051464488}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 10698367c94f1cb468fe5e630a06e955, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.OldMan.RifleAim
-  _componentIndexCache: 255
-  _addedNetworkObject: {fileID: 8169274461671871203}
-  _networkObjectCache: {fileID: 0}
-  brain: {fileID: 3120213650661026982}
-  rifle: {fileID: 6651582023274082426}
-  shoulderOffset: {x: 0.18, y: 1.35, z: 0.08}
-  aimHeight: 0.25
-  stockGrip: {x: 0.02, y: -0.04, z: 0}
-  foreGrip: {x: -0.32, y: -0.04, z: 0}
-  rightHandEuler: {x: 0, y: 0, z: -90}
-  leftHandEuler: {x: 0, y: 0, z: 90}
-  blendTime: 0.15
-  recoilTime: 0.25
-  recoilKick: 0.12
-  recoilPitch: 12
-  bodyLook: 0.4
-  headLook: 0.9
 --- !u!1 &3871579535469855889
 GameObject:
   m_ObjectHideFlags: 0

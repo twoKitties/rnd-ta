@@ -68,7 +68,7 @@ namespace _Game.Code.Player
         [Header("Gravity and jump")]
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float groundedStick = -1f;
-        [SerializeField] private float jumpHeight = 0.15f;
+        [SerializeField] private float jumpHeight = 0.45f;
 
         [Header("Crouch (MECHANICS.md 3.1)")]
         [Tooltip("Capsule height while crouched, local units on the 0.1 root — 2.6 is 0.26 m. " +
@@ -245,7 +245,11 @@ namespace _Game.Code.Player
         // straight back up.
         private void Crouch()
         {
-            var target = Intent.Crouch ? 1f : 0f;
+            // Hands full, no crouching (MECHANICS.md 3.1): the carried animal rides an
+            // anchor that does not drop with the capsule. Pet.CanBeTakenBy closes the
+            // other side, so this state is not reachable from a crouch either.
+            var canCrouch = hands == null || hands.IsEmpty;
+            var target = Intent.Crouch && canCrouch ? 1f : 0f;
 
             if (target < _crouch && NoHeadroom())
             {
@@ -302,11 +306,18 @@ namespace _Game.Code.Player
 
             for (var i = 0; i < found; i++)
             {
-                // Our own capsule is in that space by definition.
-                if (_headroom[i].transform.root != transform)
+                var root = _headroom[i].transform.root;
+
+                // Our own capsule is in that space by definition, and a teammate
+                // standing against us is not a ceiling — avatars share the Default
+                // layer with the house, so the mask cannot tell them apart. Their
+                // controller is switched off by LocalAvatar but still on the root.
+                if (root == transform || root.GetComponent<PlayerController>() != null)
                 {
-                    return true;
+                    continue;
                 }
+
+                return true;
             }
 
             return false;

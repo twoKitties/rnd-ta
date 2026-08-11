@@ -19,8 +19,22 @@ namespace _Game.Code.Player
 
         [SerializeField] private Pet carried;
 
+        private PlayerController _controller;
+
+        private void Awake()
+        {
+            _controller = GetComponent<PlayerController>();
+        }
+
         /// <summary>What the player is holding, or null.</summary>
         public Pet Carried => carried;
+
+        /// <summary>
+        /// Down on one knee, asked of the hands because that is what the pickup rule
+        /// already holds (MECHANICS.md 3.3). Cached: <see cref="Pet.CanBeTakenBy"/>
+        /// runs over every animal every frame.
+        /// </summary>
+        public bool Crouched => _controller != null && _controller.Crouched;
 
         // Plain == on a Unity object: a destroyed one compares == null but is not a
         // real null, so `?.` and `??` would lie about it.

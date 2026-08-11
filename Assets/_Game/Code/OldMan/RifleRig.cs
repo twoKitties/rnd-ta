@@ -57,10 +57,6 @@ namespace _Game.Code.OldMan
         [Tooltip("Butt of the stock while shouldered, in his root space. His root scale is 1.")]
         [SerializeField] private Vector3 shoulderOffset = new Vector3(0.18f, 1.35f, 0.08f);
 
-        [Tooltip("Aimed height above the target spot, world m. The brain hands over the " +
-                 "victim's feet; the alien is 0.5 m tall, so half of that is the chest.")]
-        [SerializeField] private float aimHeight = 0.25f;
-
         [Header("Grips, rifle mesh space (barrel is -X, ~1.14 m long)")]
         [SerializeField] private Vector3 stockGrip = new Vector3(0.02f, -0.04f, 0f);
         [SerializeField] private Vector3 foreGrip = new Vector3(-0.45f, -0.04f, 0f);
@@ -152,7 +148,10 @@ namespace _Game.Code.OldMan
                 _wantAim = brain != null && brain.isActiveAndEnabled && brain.State == OldManState.Aim;
                 if (_wantAim)
                 {
-                    _point = brain.TargetSpot + Vector3.up * aimHeight;
+                    // The brain's own aim point, not the floor spot plus a constant:
+                    // sight and the pellet both test the capsule centre, and a crouched
+                    // one sits 0.12 m lower than a standing one.
+                    _point = brain.AimSpot;
                 }
 
                 if (spawned)

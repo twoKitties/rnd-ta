@@ -200,7 +200,7 @@ namespace _Game.Code.Doors
         // CharacterController.Move, which also runs in Update.
         private void Update()
         {
-            if (_angle == _targetAngle)
+            if (Mathf.Approximately(_angle, _targetAngle))
             {
                 return;
             }

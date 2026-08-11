@@ -167,6 +167,10 @@ namespace _Game.Code.OldMan
         // player. The two never overlap: he does not walk towards someone he can see.
         private Vector3 _targetSpot;
 
+        // Where on that player the rifle points. Written only when one is seen, which
+        // is the only way into Aim — the state RifleRig reads it in.
+        private Vector3 _aimSpot;
+
         private Door _blockingDoor;
         private Collider _blockingDoorBody;
 
@@ -180,10 +184,19 @@ namespace _Game.Code.OldMan
 
         /// <summary>
         /// Where he is going — while aiming, the victim's position, refreshed every
-        /// frame he can still see them. Read by <see cref="RifleRig"/> to point the
-        /// rifle; a read-only window, so the netcode stays out of the brain.
+        /// frame he can still see them. A point on the floor: it is also what he walks
+        /// to when he loses them.
         /// </summary>
         public Vector3 TargetSpot => _targetSpot;
+
+        /// <summary>
+        /// Where the rifle points: the victim's own <see cref="SensedPlayer.AimPoint"/>,
+        /// the capsule centre that sight and the pellet are already tested against.
+        /// Read by <see cref="RifleRig"/>; a read-only window, so the netcode stays out
+        /// of the brain. Not derivable from <see cref="TargetSpot"/> by a constant —
+        /// a crouching player's centre is half the standing one (MECHANICS.md 3.1).
+        /// </summary>
+        public Vector3 AimSpot => _aimSpot;
 
         private void Awake()
         {
@@ -248,6 +261,7 @@ namespace _Game.Code.OldMan
                 }
 
                 _targetSpot = seen.Transform.position;
+                _aimSpot = seen.AimPoint;
             }
 
             switch (State)

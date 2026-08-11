@@ -178,13 +178,22 @@ namespace _Game.Code.Pets
         }
 
         /// <summary>
-        /// The rule: is this animal free, are those hands free, and are they close
-        /// enough. Pure — it changes nothing, so the host can ask it about a request
-        /// that arrived over the wire.
+        /// The rule: is this animal free, are those hands free, is the player standing,
+        /// and are they close enough. Pure — it changes nothing, so the host can ask it
+        /// about a request that arrived over the wire; the crouch flag it reads is the
+        /// replicated one (PlayerMotion), so the answer is the same on both sides.
         /// </summary>
         public bool CanBeTakenBy(PlayerHands hands)
         {
             if (hands == null || Carrier != null || !hands.IsEmpty)
+            {
+                return false;
+            }
+
+            // No picking an animal up from a crouch (MECHANICS.md 3.3), the other half
+            // of "hands full, no crouching" — together they make carrying while
+            // crouched unreachable, so the carry anchors never have to drop.
+            if (hands.Crouched)
             {
                 return false;
             }

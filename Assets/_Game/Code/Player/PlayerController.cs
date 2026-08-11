@@ -70,6 +70,24 @@ namespace _Game.Code.Player
         [SerializeField] private float groundedStick = -1f;
         [SerializeField] private float jumpHeight = 0.15f;
 
+        [Header("Crouch (MECHANICS.md 3.1)")]
+        [Tooltip("Capsule height while crouched, local units on the 0.1 root — 2.6 is 0.26 m. " +
+                 "The gaps it has to fit through are measured in MECHANICS.md 3.1; the standing " +
+                 "height, centre and eye are read off the prefab, not retyped here.")]
+        [SerializeField] private float crouchHeight = 2.6f;
+
+        [Tooltip("Seconds to drop or rise.")]
+        [SerializeField] private float crouchBlend = 0.12f;
+
+        // Default: Default + BlockedArea + MovingObstacles + Door. WalkingArea is
+        // deliberately out — the floor sits within a capsule radius of the crouched
+        // head, so including it would report a ceiling every frame, and in a
+        // single-storey house nothing walkable is ever overhead. The Pet layer is out
+        // too: a carried Dog rides above the head and is not parented to the avatar,
+        // so it cannot be skipped as one of our own colliders.
+        [Tooltip("What counts as a ceiling when standing up.")]
+        [SerializeField] private LayerMask headroomMask = (1 << 0) | (1 << 7) | (1 << 8) | (1 << 9);
+
         /// <summary>Current movement state. Block 2 reads this to derive noise.</summary>
         public MoveState State { get; private set; } = MoveState.Idle;
 
@@ -106,11 +124,23 @@ namespace _Game.Code.Player
         /// The state change of MECHANICS.md 7.4, and the mirror of <see cref="Move"/>,
         /// which is the same assignment made from a device.
         /// </summary>
-        public void ApplyMotion(MoveState state, float speed)
+        public void ApplyMotion(MoveState state, float speed, bool crouched)
         {
             State = state;
             Speed = speed;
+
+            // Snapped rather than blended: Update does not run on an avatar we do not
+            // own, and the capsule is invisible — what reads it is SensedPlayer.AimPoint
+            // (and a spectator, through CameraRoot).
+            ApplyCrouch(crouched ? 1f : 0f);
         }
+
+        /// <summary>
+        /// Down on one knee. Read by <see cref="PlayerMotion"/>, which carries it to the
+        /// peers that do not own this avatar — without it the server keeps aiming at a
+        /// crouched player's standing capsule centre.
+        /// </summary>
+        public bool Crouched => _crouch > 0.5f;
 
         /// <summary>
         /// Where this avatar's eyes are: the transform <see cref="Look"/> pitches, and
@@ -134,10 +164,29 @@ namespace _Game.Code.Player
         private float _pitch;
         private float _verticalVelocity;
 
+        // The prefab's own standing pose, so the two heights are never both tunables.
+        private float _standHeight;
+        private Vector3 _standCenter;
+        private float _standEye;
+
+        // 0 standing, 1 crouched.
+        private float _crouch;
+
+        private readonly Collider[] _headroom = new Collider[8];
+
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
             _input = new InputSystem_Actions();
+
+            _standHeight = _controller.height;
+            _standCenter = _controller.center;
+
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (cameraRoot != null)
+            {
+                _standEye = cameraRoot.localPosition.y;
+            }
         }
 
         private void OnEnable()
@@ -186,7 +235,81 @@ namespace _Game.Code.Player
             Intent = ReadInput();
 
             Look();
+            Crouch();
             Move();
+        }
+
+        // Before Move, so this frame walks on the capsule the player asked for.
+        // Driven by the button and not by State: ResolveState answers Idle whenever
+        // there is no movement input, so a player crouching on the spot would stand
+        // straight back up.
+        private void Crouch()
+        {
+            var target = Intent.Crouch ? 1f : 0f;
+
+            if (target < _crouch && NoHeadroom())
+            {
+                target = _crouch;
+            }
+
+            var step = crouchBlend > 0f ? Time.deltaTime / crouchBlend : 1f;
+            ApplyCrouch(Mathf.MoveTowards(_crouch, target, step));
+        }
+
+        private void ApplyCrouch(float amount)
+        {
+            _crouch = amount;
+
+            var height = Mathf.Lerp(_standHeight, crouchHeight, amount);
+            _controller.height = height;
+
+            // Half the height: the capsule stands on the ground, so its centre follows
+            // the top rather than staying put.
+            _controller.center = new Vector3(_standCenter.x, height * 0.5f, _standCenter.z);
+
+            if (cameraRoot == null)
+            {
+                return;
+            }
+
+            var eye = cameraRoot.localPosition;
+            eye.y = _standEye * (height / _standHeight);
+            cameraRoot.localPosition = eye;
+        }
+
+        /// <summary>
+        /// Something over the head, so standing up is refused — which is what keeps a
+        /// player who crawled under a table under it. Swept upward from the top of the
+        /// capsule as it is now, through the space the standing one would need.
+        /// </summary>
+        private bool NoHeadroom()
+        {
+            var scale = transform.lossyScale.y;
+            var radius = _controller.radius * scale;
+            var rise = (_standHeight - _controller.height) * scale;
+
+            if (rise <= 0f)
+            {
+                return false;
+            }
+
+            var foot = transform.TransformPoint(new Vector3(_standCenter.x, 0f, _standCenter.z));
+            var from = foot + Vector3.up * (_controller.height * scale - radius);
+            var to = from + Vector3.up * rise;
+
+            var found = Physics.OverlapCapsuleNonAlloc(from, to, radius, _headroom, headroomMask,
+                QueryTriggerInteraction.Ignore);
+
+            for (var i = 0; i < found; i++)
+            {
+                // Our own capsule is in that space by definition.
+                if (_headroom[i].transform.root != transform)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Devices in, intent out, nothing else. Deliberately produces no side effects:

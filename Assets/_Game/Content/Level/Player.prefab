@@ -905,7 +905,12 @@ MonoBehaviour:
   pitchLimit: 85
   gravity: -9.81
   groundedStick: -1
-  jumpHeight: 0.15
+  jumpHeight: 0.45
+  crouchHeight: 2.6
+  crouchBlend: 0.12
+  headroomMask:
+    serializedVersion: 2
+    m_Bits: 897
 --- !u!114 &453437188438686483
 MonoBehaviour:
   m_ObjectHideFlags: 0

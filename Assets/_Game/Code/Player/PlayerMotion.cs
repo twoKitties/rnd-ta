@@ -45,6 +45,10 @@ namespace _Game.Code.Player
         private readonly SyncVar<MoveState> _state = new SyncVar<MoveState>();
         private readonly SyncVar<float> _speed = new SyncVar<float>();
 
+        // Not derivable from the state: a player crouching on the spot is Idle, and the
+        // capsule this sizes is what SensedPlayer.AimPoint reads (MECHANICS.md 3.1).
+        private readonly SyncVar<bool> _crouched = new SyncVar<bool>();
+
         private PlayerController _controller;
 
         // Asked through the NetworkObject rather than through NetworkBehaviour's own
@@ -65,6 +69,7 @@ namespace _Game.Code.Player
         // handful of packets a second at worst.
         private MoveState _sent = MoveState.Idle;
         private float _sentSpeed;
+        private bool _sentCrouch;
 
         private void Awake()
         {
@@ -73,12 +78,14 @@ namespace _Game.Code.Player
 
             _state.OnChange += OnStateChanged;
             _speed.OnChange += OnSpeedChanged;
+            _crouched.OnChange += OnCrouchChanged;
         }
 
         private void OnDestroy()
         {
             _state.OnChange -= OnStateChanged;
             _speed.OnChange -= OnSpeedChanged;
+            _crouched.OnChange -= OnCrouchChanged;
         }
 
         public override void OnStartClient()
@@ -105,6 +112,11 @@ namespace _Game.Code.Player
             Apply();
         }
 
+        private void OnCrouchChanged(bool previous, bool next, bool asServer)
+        {
+            Apply();
+        }
+
         // Only where this avatar is not being driven locally. On the owner's own
         // machine PlayerController is live and is the authority on its own movement;
         // writing to it there would be a round trip fighting the keyboard.
@@ -115,7 +127,7 @@ namespace _Game.Code.Player
                 return;
             }
 
-            _controller.ApplyMotion(_state.Value, _speed.Value);
+            _controller.ApplyMotion(_state.Value, _speed.Value, _crouched.Value);
         }
 
         private void Update()
@@ -129,24 +141,27 @@ namespace _Game.Code.Player
 
             var state = _controller.State;
             var speed = _controller.Speed;
+            var crouched = _controller.Crouched;
 
-            if (state == _sent && Mathf.Abs(speed - _sentSpeed) < speedEpsilon)
+            if (state == _sent && crouched == _sentCrouch && Mathf.Abs(speed - _sentSpeed) < speedEpsilon)
             {
                 return;
             }
 
             _sent = state;
             _sentSpeed = speed;
+            _sentCrouch = crouched;
 
             // A host owns its own avatar and is already where the decisions are made.
             if (IsServerInitialized)
             {
                 _state.Value = state;
                 _speed.Value = speed;
+                _crouched.Value = crouched;
                 return;
             }
 
-            Report(state, speed);
+            Report(state, speed, crouched);
         }
 
         // The owner is the only one who can answer this, so ownership is required —
@@ -154,10 +169,11 @@ namespace _Game.Code.Player
         // world and a client's claim cannot be trusted. Here the claim *is* the fact:
         // nobody else knows which keys are being held.
         [ServerRpc]
-        private void Report(MoveState state, float speed)
+        private void Report(MoveState state, float speed, bool crouched)
         {
             _state.Value = state;
             _speed.Value = speed;
+            _crouched.Value = crouched;
         }
     }
 }

@@ -84,6 +84,13 @@ namespace _Game.Code.UI
 
         private void OnEnable()
         {
+            // A domain reload re-runs OnEnable on a live instance without re-running
+            // Awake, and _input is not serialized — the wrapper Awake made is gone.
+            if (_input == null)
+            {
+                _input = new InputSystem_Actions();
+            }
+
             // The UI map, not the Player map: Escape is UI/Cancel in
             // InputSystem_Actions, and the player's own map is switched off the moment
             // they are shot.
@@ -114,7 +121,13 @@ namespace _Game.Code.UI
 
         private void OnDestroy()
         {
-            _input.Dispose();
+            // Null after a domain reload if this instance stayed disabled throughout
+            // (LocalAvatar keeps it off on every avatar but ours), so OnEnable never
+            // rebuilt it.
+            if (_input != null)
+            {
+                _input.Dispose();
+            }
         }
 
         /// <summary>Bound by LevelBootstrapper, like the rest of the HUD: the goal is a scene object.</summary>

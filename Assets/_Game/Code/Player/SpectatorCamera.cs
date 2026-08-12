@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using _Game.Code.AI;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace _Game.Code.Player
 {
@@ -46,6 +47,20 @@ namespace _Game.Code.Player
         private Vector3 _homePosition;
         private Quaternion _homeRotation;
         private bool _detached;
+
+        /// <summary>Key names for the HUD hint. Binding 0 is the keyboard, 1 the gamepad.</summary>
+        public string PreviousDisplayName => DisplayName(_input == null ? null : _input.Player.Previous);
+
+        public string NextDisplayName => DisplayName(_input == null ? null : _input.Player.Next);
+
+        // _input is null after a domain reload that left this component disabled — see
+        // OnDestroy.
+        private static string DisplayName(InputAction action)
+        {
+            return action == null
+                ? string.Empty
+                : action.GetBindingDisplayString(0, InputBinding.DisplayStringOptions.DontIncludeInteractions);
+        }
 
         private void Awake()
         {

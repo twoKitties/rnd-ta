@@ -16,17 +16,44 @@ namespace _Game.Code.UI
         [SerializeField] private Text counter;
         [SerializeField] private Text result;
 
+        [Tooltip("Which keys switch the watched player. Shown only while dead, and only " +
+                 "with more than one living player to switch between.")]
+        [SerializeField] private Text spectateHint;
+
         private LevelGoal _goal;
         private string _shownCounter;
         private string _shownResult;
+        private string _shownHint;
 
         // This HUD lives on the avatar it belongs to, so the death it reports is that
         // avatar's own — no lookup and no "which player is this" question.
         private PlayerLife _life;
 
+        private SpectatorCamera _spectator;
+        private string _hint = string.Empty;
+
         private void Awake()
         {
             _life = GetComponent<PlayerLife>();
+            _spectator = GetComponent<SpectatorCamera>();
+        }
+
+        // Read once: rebinding at runtime does not exist, the InteractionPromptUI idiom.
+        private void Start()
+        {
+            if (_spectator == null)
+            {
+                return;
+            }
+
+            var previous = _spectator.PreviousDisplayName;
+            var next = _spectator.NextDisplayName;
+
+            // No names, no hint: "[] / [] switch view" is worse than nothing.
+            if (previous.Length > 0 && next.Length > 0)
+            {
+                _hint = $"[{previous}] / [{next}] switch view";
+            }
         }
 
         /// <summary>Bound by LevelBootstrapper: the goal is a scene object.</summary>
@@ -43,26 +70,41 @@ namespace _Game.Code.UI
             // Unity object: a destroyed one compares == null but is not a real null.
             var dead = _life != null && _life.IsDead;
 
-            if (_goal == null)
-            {
-                Write(counter, ref _shownCounter, string.Empty);
-                Write(result, ref _shownResult, dead ? "YOU DIED" : string.Empty);
-                return;
-            }
-
             // Once the raid is over, EndScreenUI takes the screen and says so itself.
-            // This line goes quiet rather than repeating it: the panel's background is
+            // These lines go quiet rather than repeating it: the panel's background is
             // translucent, so a second "RAID FAILED" underneath reads as the text
             // doubling (reported 2026-08-05).
-            if (_goal.IsWon || _goal.IsLost)
+            var over = _goal != null && (_goal.IsWon || _goal.IsLost);
+
+            Write(counter, ref _shownCounter,
+                _goal == null || over ? string.Empty : $"Pets: {_goal.Delivered}/{_goal.Total}");
+
+            Write(result, ref _shownResult, dead && !over ? "YOU DIED" : string.Empty);
+
+            // Nothing to switch between with one living player left.
+            Write(spectateHint, ref _shownHint,
+                dead && !over && LivingPlayers() >= 2 ? _hint : string.Empty);
+        }
+
+        private static int LivingPlayers()
+        {
+            var boot = LevelBootstrapper.Current;
+            if (boot == null)
             {
-                Write(counter, ref _shownCounter, string.Empty);
-                Write(result, ref _shownResult, string.Empty);
-                return;
+                return 0;
             }
 
-            Write(counter, ref _shownCounter, $"Pets: {_goal.Delivered}/{_goal.Total}");
-            Write(result, ref _shownResult, dead ? "YOU DIED" : string.Empty);
+            var players = boot.SensedPlayers;
+            var living = 0;
+            for (var i = 0; i < players.Count; i++)
+            {
+                if (players[i].IsAlive)
+                {
+                    living++;
+                }
+            }
+
+            return living;
         }
 
         // Assigning Text.text rebuilds the mesh, so only touch it when the line

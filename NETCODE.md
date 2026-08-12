@@ -43,7 +43,7 @@ FishNet, транспорт Tugboat (LiteNetLib). Ставится через `P
 | --- | --- | --- |
 | Положение и поворот | `Code/Player/PlayerController.cs` + `NetworkTransform` на `Player.prefab` | **`NetworkTransform`, `_clientAuthoritative: 1`** — владелец двигает себя сам, остальные интерполируют |
 | Описание движения: состояние, скорость, присед | `Code/Player/PlayerMotion.cs`; читают `PlayerNoise`, `PlayerAnimator`, `AI/SensedPlayer`, `Pet.CanBeTakenBy` | **Три `SyncVar`** (`MoveState`, `float`, `bool`) + **`ServerRpc Report`** с обязательным владением: только владелец знает, какие клавиши зажаты. Шлётся по изменению, скорость — с порогом `speedEpsilon`. **Не** в списке `LocalAvatar` — обязан работать на всех пирах |
-| Наклон камеры (питч) | `PlayerController.CameraRoot` | **Не реплицируется** — см. «Известные пробелы» |
+| Наклон камеры (питч) | `PlayerMotion` → `PlayerController.ApplyPitch`; читает `SpectatorCamera` | **`SyncVar<float>` + `ServerRpc ReportPitch`**, с 2026-08-12. Единственное значение в проекте, идущее **темпом** (`pitchInterval`), а не по изменению: голова меняет угол каждый кадр. На чужих пирах догоняется за один интервал, иначе 10 Гц читаются ступеньками. Нужен только зрителю — правила смотрят на центр капсулы |
 | Смерть | `Code/Player/PlayerLife.cs` | **`SyncVar<bool> _dead`**. Решает только `DecidesHere` (сервер или процесс без сети), все пиры выполняют `ApplyDeath` из `OnChange`. Спрашивается у **процесса** (`InstanceFinder`), а не у spawn-состояния объекта: выходящего игрока убивают по дороге наружу, когда объект уже деспавнится |
 | Наблюдение за живым товарищем | `Code/Player/SpectatorCamera.cs`, `FirstPersonBody.cs` | **Своего канала нет:** копирует мировой трансформ чужого `CameraRoot`, живых берёт из `LevelBootstrapper.SensedPlayers` |
 | Шаги | `Code/Audio/FootstepAudio.cs` | **Своего канала нет и не должно быть.** Темп — из движения `NetworkTransform`, громкость — из `PlayerController.State`, который уже реплицирован `PlayerMotion` |
@@ -70,8 +70,8 @@ FishNet, транспорт Tugboat (LiteNetLib). Ставится через `P
 | --- | --- | --- |
 | Положение и анимация | `Code/OldMan/OldManBrain.cs` + `NetworkTransform` и `NetworkAnimator`, оба `_clientAuthoritative: 0` | То же, что у животных |
 | Носит / вскидывает винтовку, куда целится | `Code/OldMan/RifleRig.cs` | **Два `SyncVar`**: `bool _aiming`, `Vector3 _aimPoint`. Вся поза, блендинг carry↔aim и IK считаются локально из этой пары — поза по проводу не едет |
-| Выстрел: вспышка, звук, отдача | `Code/OldMan/ShotFlash.cs` | **`ObserversRpc(RunLocally = true)` `ObserversFire`** — одна RPC несёт всё сразу, включая `RifleRig.Kick()` |
-| Дробина и убийство | `Code/OldMan/ShotPellet.cs` | **Не сетевой объект вообще.** Каждый пир выращивает свою из той же RPC и летит по своей линии (муззл `ShotFlash` → `RifleRig.AimPoint`). Боевая только там, где `DecidesHere`; смерть приезжает через `PlayerLife._dead` |
+| Выстрел: вспышка, звук, отдача | `Code/OldMan/ShotFlash.cs` | **`ObserversRpc(RunLocally = true)` `ObserversFire(Vector3 aimPoint)`** — одна RPC несёт всё сразу: вспышку, звук, `RifleRig.Kick()` и точку прицела |
+| Дробина и убийство | `Code/OldMan/ShotPellet.cs` | **Не сетевой объект вообще.** Каждый пир выращивает свою из той же RPC: муззл — трансформ `ShotFlash.flash`, направление — точка прицела **из аргумента RPC** (с 2026-08-12; до этого бралась из SyncVar `RifleRig`, шедшей своим темпом). Боевая только там, где `DecidesHere`; смерть приезжает через `PlayerLife._dead` |
 
 ### Сдача животного в луч
 
@@ -85,9 +85,9 @@ FishNet, транспорт Tugboat (LiteNetLib). Ставится через `P
 
 ## Известные пробелы
 
-Открыты на 2026-08-12, подробности и приоритет — в очереди фиксов (см. память сессии / отчёты `netcode-readiness-auditor`).
+Открыты на 2026-08-12, подробности и приоритет — в очереди фиксов (см. отчёты `netcode-readiness-auditor`).
 
-- **Питч не реплицируется.** `NetworkTransform` один и стоит на корне `Player.prefab`, на `CameraRoot` нет ничего — мёртвый зритель смотрит за товарищем строго по горизонту. Решение (четвёртое значение в `PlayerMotion` против «принять как ограничение грейбокса») за пользователем.
-- **Сервер судит дистанционные правила по устаревшей позиции клиента** — `Pet.captureDistance`, `BeamZone.radius` против интерполяции и RTT/2; `Pet.TryTake` возвращает true на отправке, `RaidState.RequestRelease` не отвечает ничего. У хоста работает, у клиента — через раз. Лечится тем же запасом, что уже есть у двери (`Door.serverReach` против `reach`), но значение нужно взять из замера RTT на двух машинах.
-- **Линия дробины на клиенте берётся из `SyncVar` `_aimPoint`**, идущего своим темпом, а вспышка — из RPC: два канала, разный тон. Жертва может видеть промах и умереть.
-- **«Аватар не приехал вообще» не покрыт бэкстопом**: `RaidSession._avatarLostAt` взводится только из `LocalAvatarLost`, поэтому соединение, которому аватара не досталось, остаётся в `Level` без камеры, HUD и `EndScreenUI`. `PlayerSpawn` в сцене ровно 4 против `LobbyRoster.maxPlayers` 4 — запаса нет, и связи между этими двумя числами тоже нет.
+- **Сервер судит дистанционные правила по устаревшей позиции клиента** — `Pet.captureDistance`, `BeamZone.radius` против интерполяции и RTT/2; `Pet.TryTake` возвращает true на отправке, `RaidState.RequestRelease` не отвечает ничего. У хоста работает, у клиента — через раз. Лечится тем же запасом, что уже есть у двери (`Door.serverReach` против `reach`), но значение нужно взять из замера RTT на двух машинах — **единственный пункт, который ждёт замера, а не работы**.
+- **Числа спавна и лобби не связаны**: `PlayerSpawn` в сцене ровно 4 против `LobbyRoster.maxPlayers` 4, запаса нет, и ничто не следит за тем, чтобы они совпадали. Пятый игрок физически некуда встать; сегодня его не пускает лобби, но два числа держатся в согласии вручную.
+
+Закрыто 2026-08-12: питч реплицирован, точка прицела переехала в RPC выстрела, у «аватар не приехал вообще» появился бэкстоп (`RaidSession._hasAvatar` + арм по сцене уровня), `DoorGate` возвращает ближайшую створку.

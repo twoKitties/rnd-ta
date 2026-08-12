@@ -20,8 +20,9 @@ namespace _Game.Code.OldMan
     /// </summary>
     public class ShotPellet : MonoBehaviour
     {
-        [Tooltip("Flight speed, world m/s. The player sprints at 5: point blank is " +
-                 "certain death, across a room there is time to step off the line.")]
+        [Tooltip("Flight speed, world m/s. The player sprints at 4 (MECHANICS.md " +
+                 "section 2): point blank is certain death, across a room there is " +
+                 "time to step off the line.")]
         [SerializeField] private float speed = 10f;
 
         [Tooltip("How close to the middle of a player's capsule counts as a hit, m. " +
@@ -64,7 +65,10 @@ namespace _Game.Code.OldMan
             // Ray per step rather than a collider: at 10 m/s a frame is ~0.16 m, and
             // a swept test cannot tunnel through a wall the way an overlap could.
             RaycastHit wall;
-            if (Physics.Raycast(transform.position, _direction, out wall, step, blockers))
+            // Queries Hit Triggers is on project-wide: a trigger added to BlockedArea or
+            // Door later would otherwise stop every shot.
+            if (Physics.Raycast(transform.position, _direction, out wall, step, blockers,
+                    QueryTriggerInteraction.Ignore))
             {
                 Destroy(gameObject);
                 return;

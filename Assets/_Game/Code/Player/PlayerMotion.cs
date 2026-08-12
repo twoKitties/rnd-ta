@@ -33,6 +33,10 @@ namespace _Game.Code.Player
     /// Movement itself is not sent here — that is NetworkTransform's job, and the
     /// avatar is client-authoritative. This is only the *description* of the movement,
     /// which the transform does not carry.
+    ///
+    /// Since 2026-08-12 it also carries the look pitch: no rule reads it, but a dead
+    /// player spectates out of a teammate's head (MECHANICS.md 3.7) and the avatar's
+    /// only NetworkTransform is on the root, which carries yaw alone.
     /// </summary>
     [RequireComponent(typeof(PlayerController))]
     public class PlayerMotion : NetworkBehaviour
@@ -42,12 +46,23 @@ namespace _Game.Code.Player
                  "swallows the step between carrying and not carrying.")]
         [SerializeField] private float speedEpsilon = 0.05f;
 
+        [Header("Look")]
+        [Tooltip("Smallest pitch change worth a packet, degrees.")]
+        [SerializeField] private float pitchEpsilon = 1f;
+
+        [Tooltip("Gap between pitch updates, s. Sent at a rate, not on change — a turning " +
+                 "head changes every frame. Matches the SyncVar's own default send rate.")]
+        [SerializeField] private float pitchInterval = 0.1f;
+
         private readonly SyncVar<MoveState> _state = new SyncVar<MoveState>();
         private readonly SyncVar<float> _speed = new SyncVar<float>();
 
         // Not derivable from the state: a player crouching on the spot is Idle, and the
         // capsule this sizes is what SensedPlayer.AimPoint reads (MECHANICS.md 3.1).
         private readonly SyncVar<bool> _crouched = new SyncVar<bool>();
+
+        // For the spectator only; without it a dead player's view is stuck on the horizon.
+        private readonly SyncVar<float> _pitch = new SyncVar<float>();
 
         private PlayerController _controller;
 
@@ -70,6 +85,12 @@ namespace _Game.Code.Player
         private MoveState _sent = MoveState.Idle;
         private float _sentSpeed;
         private bool _sentCrouch;
+
+        private float _sentPitch;
+        private float _nextPitchAt;
+
+        // Trails _pitch — see ShowPitch.
+        private float _shownPitch;
 
         private void Awake()
         {
@@ -99,6 +120,13 @@ namespace _Game.Code.Player
             if (!IsMine)
             {
                 Apply();
+
+                // Snapped: the head arrives already pointed somewhere.
+                _shownPitch = _pitch.Value;
+                if (_controller != null)
+                {
+                    _controller.ApplyPitch(_shownPitch);
+                }
             }
         }
 
@@ -134,10 +162,18 @@ namespace _Game.Code.Player
         {
             // Nothing to send when there is no network: the one PlayerController in the
             // process is already the source everything reads.
-            if (!IsReplicated || !IsMine || _controller == null)
+            if (!IsReplicated || _controller == null)
             {
                 return;
             }
+
+            if (!IsMine)
+            {
+                ShowPitch();
+                return;
+            }
+
+            SendPitch();
 
             var state = _controller.State;
             var speed = _controller.Speed;
@@ -164,6 +200,40 @@ namespace _Game.Code.Player
             Report(state, speed, crouched);
         }
 
+        // One packet per interval while the head turns, none while it is still.
+        private void SendPitch()
+        {
+            var pitch = _controller.Pitch;
+            if (Time.unscaledTime < _nextPitchAt ||
+                Mathf.Abs(Mathf.DeltaAngle(pitch, _sentPitch)) < pitchEpsilon)
+            {
+                return;
+            }
+
+            _sentPitch = pitch;
+            _nextPitchAt = Time.unscaledTime + pitchInterval;
+
+            if (IsServerInitialized)
+            {
+                _pitch.Value = pitch;
+                return;
+            }
+
+            ReportPitch(pitch);
+        }
+
+        // Caught up over one interval instead of snapped: a spectator sits inside this
+        // head, and 10 Hz of snapping is 10 visible steps a second.
+        private void ShowPitch()
+        {
+            var target = _pitch.Value;
+            var gap = Mathf.Abs(Mathf.DeltaAngle(_shownPitch, target));
+            var step = pitchInterval > 0f ? gap / pitchInterval * Time.deltaTime : gap;
+
+            _shownPitch = Mathf.MoveTowardsAngle(_shownPitch, target, step);
+            _controller.ApplyPitch(_shownPitch);
+        }
+
         // The owner is the only one who can answer this, so ownership is required —
         // unlike the door and the animal, where the rule is re-checked against the
         // world and a client's claim cannot be trusted. Here the claim *is* the fact:
@@ -174,6 +244,13 @@ namespace _Game.Code.Player
             _state.Value = state;
             _speed.Value = speed;
             _crouched.Value = crouched;
+        }
+
+        // Not a fourth argument on Report: the two travel at different tempos.
+        [ServerRpc]
+        private void ReportPitch(float pitch)
+        {
+            _pitch.Value = pitch;
         }
     }
 }

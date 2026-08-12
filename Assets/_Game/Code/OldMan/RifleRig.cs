@@ -117,9 +117,9 @@ namespace _Game.Code.OldMan
         }
 
         /// <summary>
-        /// Where the barrel is pointed, world: the authority's word straight from the
-        /// brain, a client's from the SyncVar. Read by ShotFlash when the blink lands
-        /// to aim the pellet, so every peer flies it along its own rifle.
+        /// Where the barrel is pointed, world: the authority's from the brain, a
+        /// client's from the SyncVar. Drawn along on every peer; on the shooter's own
+        /// machine it is also what ShotFlash sends with the shot.
         /// </summary>
         public Vector3 AimPoint => _point;
 

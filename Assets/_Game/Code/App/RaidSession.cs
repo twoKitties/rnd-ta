@@ -100,6 +100,10 @@ namespace _Game.Code.App
         // When this client last lost its own avatar, or zero while it has one.
         private float _avatarLostAt;
 
+        // "Never got one" has no callback of its own — LocalAvatarLost only fires for
+        // an avatar we had.
+        private bool _hasAvatar;
+
         // Why the last session ended, when it ended without being asked to. Held rather
         // than raised as an event: it happens in the Level, and the only thing that can
         // show it is the lobby's popup, which does not exist until a scene later. An
@@ -399,6 +403,7 @@ namespace _Game.Code.App
         /// </summary>
         public void LocalAvatarSpawned()
         {
+            _hasAvatar = true;
             _avatarLostAt = 0f;
 
             if (LoadingScreen.Active != null)
@@ -422,6 +427,8 @@ namespace _Game.Code.App
         /// </summary>
         public void LocalAvatarLost()
         {
+            _hasAvatar = false;
+
             if (IsHost || _avatarLostAt > 0f)
             {
                 return;
@@ -516,6 +523,7 @@ namespace _Game.Code.App
         {
             _inSession = false;
             _avatarLostAt = 0f;
+            _hasAvatar = false;
 
             // Also re-targets a screen still waiting for a raid that will never start.
             if (LoadingScreen.Active != null)
@@ -622,6 +630,15 @@ namespace _Game.Code.App
                 _notice = "Connection lost";
                 GoToLobbyAlone();
                 return;
+            }
+
+            // A connection the server never spawned for: no camera, no HUD, so no
+            // EndScreenUI and no way out. Armed off the level scene, so Restart's lobby
+            // leg does not start the clock.
+            if (_inSession && !IsHost && !_hasAvatar && _avatarLostAt <= 0f &&
+                UnityScenes.GetActiveScene().name == levelScene)
+            {
+                _avatarLostAt = Time.unscaledTime;
             }
 
             // Orphaned: our avatar went away and no new one arrived. See LocalAvatarLost

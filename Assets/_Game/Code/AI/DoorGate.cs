@@ -78,16 +78,29 @@ namespace _Game.Code.AI
             var count = Physics.RaycastNonAlloc(from, travel / distance, buffer, distance, doorMask,
                 QueryTriggerInteraction.Ignore);
 
+            // RaycastNonAlloc order is undefined, and both callers mean "nearest":
+            // latching the far leaf walks Old Man through the near one.
+            Door nearest = null;
+            var nearestDistance = float.MaxValue;
+
             for (var h = 0; h < count; h++)
             {
-                var door = buffer[h].collider.GetComponentInParent<Door>();
-                if (door != null && !door.IsOpen)
+                if (buffer[h].distance >= nearestDistance)
                 {
-                    return door;
+                    continue;
                 }
+
+                var door = buffer[h].collider.GetComponentInParent<Door>();
+                if (door == null || door.IsOpen)
+                {
+                    continue;
+                }
+
+                nearest = door;
+                nearestDistance = buffer[h].distance;
             }
 
-            return null;
+            return nearest;
         }
     }
 }

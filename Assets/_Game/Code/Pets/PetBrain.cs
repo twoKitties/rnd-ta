@@ -455,11 +455,8 @@ namespace _Game.Code.Pets
                 return true;
             }
 
-            // Moving upright is what frightens an animal that runs — and what draws
-            // one that guards. The Dog is not scared of somebody walking up to it; it
-            // comes to bark at them, and only a charge sends it running (4.1, design
-            // call 2026-08-04). Crouching and standing still are invisible to both
-            // reactions, which is what keeps the luring mechanic alive.
+            // Only fear is crouch-sensitive. A watchdog barks at anyone it sees,
+            // crouched or not (4.1, design call 2026-08-12).
             return sightReaction != PetSightReaction.Approach && !player.IsQuiet;
         }
 
@@ -473,9 +470,8 @@ namespace _Game.Code.Pets
                 return;
             }
 
-            // Barking while it comes. The bark is noise like a step, so this is the
-            // price of walking rather than sneaking (4.4); PetVoice's own cooldown
-            // paces it, and an empty clip slot keeps it silent.
+            // Barking while it comes. Noise like a step, so being seen at all is what
+            // costs (4.4); PetVoice's cooldown paces it, an empty clip slot silences it.
             // Same reason as the other call site: the bark has to leave this machine.
             if (_pet != null)
             {

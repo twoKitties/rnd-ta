@@ -142,6 +142,25 @@ namespace _Game.Code.Player
         /// </summary>
         public bool Crouched => _crouch > 0.5f;
 
+        /// <summary>Head pitch in degrees, positive down. Read by <see cref="PlayerMotion"/>.</summary>
+        public float Pitch => _pitch;
+
+        /// <summary>
+        /// Pitch applied from outside, as <see cref="ApplyMotion"/> is for movement.
+        /// Yaw is on the root and already travels by NetworkTransform; this does not,
+        /// and a spectator looks out of this transform (MECHANICS.md 3.7).
+        /// </summary>
+        public void ApplyPitch(float pitch)
+        {
+            _pitch = pitch;
+
+            // Unity object: destroyed compares == null but is not null.
+            if (cameraRoot != null)
+            {
+                cameraRoot.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+            }
+        }
+
         /// <summary>
         /// Where this avatar's eyes are: the transform <see cref="Look"/> pitches, and
         /// the one a spectator copies to look out of a teammate's head. Exposed rather

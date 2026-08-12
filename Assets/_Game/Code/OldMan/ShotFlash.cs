@@ -8,8 +8,9 @@ namespace _Game.Code.OldMan
     /// Old Man firing, as seen, heard and felt: a light blinked for a few frames,
     /// the bang, the recoil kick handed to <see cref="RifleRig"/>, and — since
     /// 2026-08-06 — the <see cref="ShotPellet"/> grown from the muzzle, which is
-    /// what carries the kill now. All of it rides this component's one RPC so
-    /// firing travels once (MECHANICS.md 5.2 and 5.6). The sound is the loudest
+    /// what carries the kill now. All of it rides this component's one RPC — which
+    /// since 2026-08-12 carries the aim point too — so firing travels once
+    /// (MECHANICS.md 5.2 and 5.6). The sound is the loudest
     /// half of the show: the flash is over in 0.06 s and a victim facing away
     /// misses it entirely.
     ///
@@ -21,14 +22,15 @@ namespace _Game.Code.OldMan
     /// </summary>
     public class ShotFlash : NetworkBehaviour
     {
-        [Tooltip("Blinked when he fires. Optional — without it the shot is the log alone.")]
+        [Tooltip("Blinked when he fires, and read as the muzzle the pellet leaves from. " +
+                 "Not optional: without it he fires blanks.")]
         [SerializeField] private Light flash;
 
         [Tooltip("How long the flash stays lit, s (MECHANICS.md section 2).")]
         [SerializeField] private float flashTime = 0.06f;
 
-        [Tooltip("Kicked when the flash blinks, so the recoil rides the same RPC. " +
-                 "Also where the pellet's aim is read from — see below.")]
+        [Tooltip("Kicked when the flash blinks, and where the aim point is read before " +
+                 "it is sent with the shot.")]
         [SerializeField] private RifleRig rifleAim;
 
         [Tooltip("The shot itself since 2026-08-06: grown from the muzzle on every " +
@@ -68,28 +70,34 @@ namespace _Game.Code.OldMan
         /// </summary>
         public void Fire()
         {
+            // Sent with the shot rather than read at the far end: a client's RifleRig
+            // has it from a SyncVar going at its own rate, and the gap is a pellet that
+            // visibly misses and kills anyway.
+            // Unity object: destroyed compares == null but is not null.
+            var aimPoint = rifleAim != null ? rifleAim.AimPoint : transform.position + transform.forward;
+
             var nob = NetworkObject;
             if (nob == null || !nob.IsSpawned)
             {
-                Blink();
+                Blink(aimPoint);
                 return;
             }
 
             if (nob.IsServerInitialized)
             {
-                ObserversFire();
+                ObserversFire(aimPoint);
             }
         }
 
         // RunLocally so the server takes the same path as everybody else and the blink
         // is produced in exactly one place.
         [ObserversRpc(RunLocally = true)]
-        private void ObserversFire()
+        private void ObserversFire(Vector3 aimPoint)
         {
-            Blink();
+            Blink(aimPoint);
         }
 
-        private void Blink()
+        private void Blink(Vector3 aimPoint)
         {
             // The sound first, and on its own exit: it is the louder half of the show
             // by far. The flash lasts 0.06 s and a victim facing away never sees it at
@@ -102,7 +110,7 @@ namespace _Game.Code.OldMan
             }
 
             // Before the kick: the pellet leaves along the aim, not the recoil throw.
-            LaunchPellet();
+            LaunchPellet(aimPoint);
 
             // Unity object: a destroyed one compares == null but is not a real null.
             if (rifleAim != null)
@@ -120,14 +128,13 @@ namespace _Game.Code.OldMan
         }
 
         /// <summary>
-        /// The muzzle is the flash's own transform — it hangs on the barrel tip and
-        /// travels with the raised rifle — and the aim is RifleRig's synced point,
-        /// so every peer computes the same line without a byte added to the RPC.
+        /// Muzzle is the flash's own transform (it hangs on the barrel tip); the aim
+        /// arrives with the shot, so every peer flies the same line.
         /// </summary>
-        private void LaunchPellet()
+        private void LaunchPellet(Vector3 aimPoint)
         {
             // Unity objects: a destroyed one compares == null but is not a real null.
-            if (pelletPrefab == null || rifleAim == null || flash == null)
+            if (pelletPrefab == null || flash == null)
             {
                 // Loud on purpose: the kill left the brain on 2026-08-06 and rides
                 // this pellet, so an unwired reference is not a missing visual — it
@@ -137,7 +144,7 @@ namespace _Game.Code.OldMan
             }
 
             var muzzle = flash.transform.position;
-            var direction = rifleAim.AimPoint - muzzle;
+            var direction = aimPoint - muzzle;
             if (direction.sqrMagnitude < 0.0001f)
             {
                 direction = transform.forward;

@@ -1,12 +1,15 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using _Game.Code.App;
-using FishNet;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace _Game.Code.UI
 {
-    public class LobbyUI : MonoBehaviour
+    /// <summary>
+    /// The way into a session and nothing else: host or join, then the hub takes over.
+    /// Who is connected and where they fly are the hub's questions, not this screen's.
+    /// </summary>
+    public class MenuView : MonoBehaviour
     {
         private enum Panel
         {
@@ -16,40 +19,30 @@ namespace _Game.Code.UI
         }
 
         /// <summary>
-        /// Where we are inside the lobby panel. Three steps rather than three panels
-        /// that happen to overlap: Options and the player list were both switched on at
-        /// once, and their two Back buttons sat on exactly the same 200×70 rectangle —
-        /// the click went to the one on top, which was wired to nothing (measured in
-        /// Play mode, 2026-08-04).
+        /// Where we are inside the lobby panel. Two steps rather than two panels that
+        /// happen to overlap: both Back buttons sat on exactly the same rectangle and
+        /// the click went to the one on top, which was wired to nothing.
         /// </summary>
         private enum LobbyStep
         {
             Options,
-            Address,
-            Players
+            Address
         }
-        
+
         [SerializeField] private Button _playButton;
         [SerializeField] private Button _settingsButton;
         [SerializeField] private Button _exitButton;
         [SerializeField] private Button _backLobbyButton;
         [SerializeField] private Button _backSettingsButton;
-        [SerializeField] private Button _backOptionsButton;
         [SerializeField] private Button _hostButton;
         [SerializeField] private Button _connectButton;
         [SerializeField] private CanvasGroup _mainMenuPanel;
         [SerializeField] private CanvasGroup _lobbyPanel;
         [SerializeField] private CanvasGroup _settingsPanel;
-        [SerializeField] private RectTransform _playerList;
-        [SerializeField] private PlayerLobbyUI _playerLobbyUIPrefab;
 
         [Tooltip("Where the host's address is typed. Over Tailscale that is their " +
                  "tailnet IP — no relay, no matchmaking.")]
         [SerializeField] private InputField _addressField;
-
-        [Tooltip("Starts the raid. Only the host has one that works, and only once " +
-                 "everybody in the list is ready.")]
-        [SerializeField] private Button _startButton;
 
         [Header("Lobby steps")]
         [Tooltip("Host / Connect. LobbyPanel/Options.")]
@@ -58,8 +51,8 @@ namespace _Game.Code.UI
         [Tooltip("Where ip:port is typed, shown after Connect.")]
         [SerializeField] private GameObject _addressPanel;
 
-        [Tooltip("The player list, shown once we are actually in a session. " +
-                 "LobbyPanel/PanelAfterOptions.")]
+        [Tooltip("The old player list. Kept only to be switched off — an invisible " +
+                 "panel left active still eats clicks.")]
         [SerializeField] private GameObject _playersPanel;
 
         [Tooltip("Confirms the typed address. The Connect button in Options only opens " +
@@ -75,27 +68,21 @@ namespace _Game.Code.UI
                  "seconds reads as a bug.")]
         [SerializeField] private GameObject _connectingIndicator;
 
-        [Tooltip("Shows the host their own address so they can read it out. Only they " +
-                 "have one worth showing — a client already knows what it typed.")]
-        [SerializeField] private Text _hostAddressLabel;
-
         [Header("Popup")]
         [SerializeField] private GameObject _popup;
         [SerializeField] private Text _popupText;
         [SerializeField] private Button _popupOkButton;
 
         private readonly Dictionary<Panel, CanvasGroup> _panels = new();
-        private readonly List<PlayerLobbyUI> _rows = new();
 
-        private LobbyRoster _roster;
         private RaidSession _session;
 
         /// <summary>
-        /// The lobby while it is on screen. Read by <see cref="LoadingScreen"/> as "is
+        /// The menu while it is on screen. Read by <see cref="LoadingScreen"/> as "is
         /// the main menu up" — SceneManager.sceneLoaded does not answer that, it never
         /// fires for a scene FishNet skips as already loaded.
         /// </summary>
-        public static LobbyUI Current { get; private set; }
+        public static MenuView Current { get; private set; }
 
         private void Awake()
         {
@@ -109,19 +96,9 @@ namespace _Game.Code.UI
             _hostButton.onClick.AddListener(Host);
             _connectButton.onClick.AddListener(OpenAddressStep);
 
-            if (_startButton != null)
-            {
-                _startButton.onClick.AddListener(StartRaid);
-            }
-
             if (_connectConfirmButton != null)
             {
                 _connectConfirmButton.onClick.AddListener(Connect);
-            }
-
-            if (_backOptionsButton != null)
-            {
-                _backOptionsButton.onClick.AddListener(LeaveToOptions);
             }
 
             if (_backAddressButton != null)
@@ -145,18 +122,15 @@ namespace _Game.Code.UI
             ShowStep(LobbyStep.Options);
             ClosePopup();
 
-            // Same reason as the panel above: these two are authored visible in the
-            // scene and would otherwise stay that way until something happened to
-            // change them — a "connecting" label on a screen that is not connecting,
-            // and a Start button that works before there is a session to start.
+            // Same reason as the panel above: authored visible in the scene, and would
+            // otherwise stay that way until something happened to change it.
             ShowConnecting(false);
-            Repaint();
 
             // Why the last session ended, if it ended on its own. It is collected here
             // rather than delivered by an event because the thing that ended it happened
-            // in the Level, a scene ago — there was nothing on screen then that could
-            // have said it, and ClosePopup above would have wiped it anyway. Consumed,
-            // so it is shown once.
+            // a scene ago — there was nothing on screen then that could have said it,
+            // and ClosePopup above would have wiped it anyway. Consumed, so it is shown
+            // once.
             var notice = RaidSession.Active == null ? null : RaidSession.Active.ConsumeNotice();
             if (!string.IsNullOrEmpty(notice))
             {
@@ -174,19 +148,9 @@ namespace _Game.Code.UI
             _hostButton.onClick.RemoveAllListeners();
             _connectButton.onClick.RemoveAllListeners();
 
-            if (_startButton != null)
-            {
-                _startButton.onClick.RemoveAllListeners();
-            }
-
             if (_connectConfirmButton != null)
             {
                 _connectConfirmButton.onClick.RemoveAllListeners();
-            }
-
-            if (_backOptionsButton != null)
-            {
-                _backOptionsButton.onClick.RemoveAllListeners();
             }
 
             if (_backAddressButton != null)
@@ -199,44 +163,11 @@ namespace _Game.Code.UI
                 _popupOkButton.onClick.RemoveAllListeners();
             }
 
-            Unsubscribe();
             UnsubscribeSession();
 
             if (Current == this)
             {
                 Current = null;
-            }
-        }
-
-        // The roster is spawned by the host over the network, so it does not exist when
-        // this scene loads and cannot be wired to in the editor. Watching for it here
-        // is cheaper and less fragile than an event that has to survive a scene load;
-        // it is one reference comparison a frame.
-        private void Update()
-        {
-            var current = LobbyRoster.Current;
-            if (current == _roster)
-            {
-                return;
-            }
-
-            Unsubscribe();
-            _roster = current;
-
-            if (_roster != null)
-            {
-                _roster.Changed += Repaint;
-            }
-
-            Repaint();
-        }
-
-        private void Unsubscribe()
-        {
-            // Unity object: a destroyed one compares == null but is not a real null.
-            if (_roster != null)
-            {
-                _roster.Changed -= Repaint;
             }
         }
 
@@ -248,13 +179,9 @@ namespace _Game.Code.UI
                 return;
             }
 
-            // Straight to the list: hosting cannot "not be found", and the host's own
-            // client is added to the roster like anybody else, so it lands there with
-            // one row already in it.
             SubscribeSession(session);
             if (session.Host())
             {
-                ShowStep(LobbyStep.Players);
                 ShowConnecting(true);
             }
         }
@@ -264,8 +191,7 @@ namespace _Game.Code.UI
             ShowStep(LobbyStep.Address);
         }
 
-        // Nothing to disconnect here — this step is reached before dialling — so unlike
-        // the way back from the player list it only changes the picture.
+        // Nothing to disconnect here — this step is reached before dialling.
         private void BackFromAddress()
         {
             ShowStep(LobbyStep.Options);
@@ -282,33 +208,15 @@ namespace _Game.Code.UI
             SubscribeSession(session);
             if (session.Join(_addressField == null ? string.Empty : _addressField.text))
             {
-                // Not to the list yet — being told "connected" is what moves us there.
-                // Until then the attempt is in flight and has to look like it.
                 ShowConnecting(true);
             }
-        }
-
-        /// <summary>
-        /// Back out of the player list. It drops the connection rather than only
-        /// changing the picture: staying in somebody's session while looking at the
-        /// Host/Connect screen is a state with no way back out of it.
-        /// </summary>
-        private void LeaveToOptions()
-        {
-            if (RaidSession.Active != null)
-            {
-                RaidSession.Active.Leave();
-            }
-
-            ShowConnecting(false);
-            ShowStep(LobbyStep.Options);
         }
 
         private RaidSession RequireSession()
         {
             if (RaidSession.Active == null)
             {
-                Debug.LogError("LobbyUI: no RaidSession — the Loading scene did not run.");
+                Debug.LogError("MenuView: no RaidSession — the Loading scene did not run.");
                 ShowPopup("Сессия не запущена");
                 return null;
             }
@@ -342,10 +250,18 @@ namespace _Game.Code.UI
             _session = null;
         }
 
+        // The host takes everybody to the hub. A client does nothing: FishNet sends a
+        // newly authenticated connection the global scenes that are already loaded,
+        // with the parameters of the load that put them there, so the hub and the
+        // loading screen both arrive on their own.
         private void OnConnected()
         {
             ShowConnecting(false);
-            ShowStep(LobbyStep.Players);
+
+            if (RaidSession.Active != null && RaidSession.Active.IsHost)
+            {
+                RaidSession.Active.GoToHub();
+            }
         }
 
         private void OnConnectFailed(string reason)
@@ -372,7 +288,7 @@ namespace _Game.Code.UI
 
             if (_playersPanel != null)
             {
-                _playersPanel.SetActive(step == LobbyStep.Players);
+                _playersPanel.SetActive(false);
             }
         }
 
@@ -408,7 +324,7 @@ namespace _Game.Code.UI
             else
             {
                 // No popup wired yet: say it somewhere rather than swallowing it.
-                Debug.LogWarning($"LobbyUI: {message}");
+                Debug.LogWarning($"MenuView: {message}");
             }
         }
 
@@ -417,68 +333,6 @@ namespace _Game.Code.UI
             if (_popup != null)
             {
                 _popup.SetActive(false);
-            }
-        }
-
-        private void StartRaid()
-        {
-            // Asked again here rather than trusted from the last repaint: between the
-            // button becoming available and the click, somebody can have un-readied or
-            // left. The host is the only one this does anything on anyway.
-            if (RaidSession.Active == null || _roster == null || !_roster.EveryoneReady())
-            {
-                return;
-            }
-
-            RaidSession.Active.StartRaid();
-        }
-
-        // The whole list, every time. It is at most four rows, and rebuilding is
-        // simpler to be right about than patching one of them.
-        private void Repaint()
-        {
-            for (var i = 0; i < _rows.Count; i++)
-            {
-                if (_rows[i] != null)
-                {
-                    Destroy(_rows[i].gameObject);
-                }
-            }
-
-            _rows.Clear();
-
-            var hosting = RaidSession.Active != null && RaidSession.Active.IsHost;
-
-            if (_hostAddressLabel != null)
-            {
-                // Only while hosting, and read fresh rather than cached: the address can
-                // change under the game if the machine reconnects to the network.
-                _hostAddressLabel.text = hosting ? $"Ваш адрес: {RaidSession.Active.LocalEndpoint}" : string.Empty;
-                _hostAddressLabel.gameObject.SetActive(hosting);
-            }
-
-            if (_startButton != null)
-            {
-                var canStart = _roster != null && RaidSession.Active != null &&
-                               RaidSession.Active.IsHost && _roster.EveryoneReady();
-                _startButton.gameObject.SetActive(_roster != null && RaidSession.Active != null &&
-                                                  RaidSession.Active.IsHost);
-                _startButton.interactable = canStart;
-            }
-
-            if (_roster == null || _playerLobbyUIPrefab == null || _playerList == null)
-            {
-                return;
-            }
-
-            var localId = InstanceFinder.ClientManager.Connection.ClientId;
-
-            for (var i = 0; i < _roster.Slots.Count; i++)
-            {
-                var slot = _roster.Slots[i];
-                var row = Instantiate(_playerLobbyUIPrefab, _playerList);
-                row.Show(slot, slot.ClientId == localId);
-                _rows.Add(row);
             }
         }
 

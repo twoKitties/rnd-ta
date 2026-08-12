@@ -16,9 +16,9 @@ using UnityScenes = UnityEngine.SceneManagement.SceneManager;
 namespace _Game.Code.App
 {
     /// <summary>
-    /// One co-op session, from the lobby to the end of a raid and back. Lives on the
+    /// One co-op session, from the menu to the end of a raid and back. Lives on the
     /// object <see cref="Bootstrapper"/> keeps alive for the whole launch, next to the
-    /// NetworkManager, because it has to outlive Lobby → Level → Lobby.
+    /// NetworkManager, because it has to outlive Menu → Hub → Level → Hub.
     ///
     /// Everything here is a decision about the session rather than about the game:
     /// who is connected, which scene everyone is in, and when the door closes. The
@@ -33,8 +33,11 @@ namespace _Game.Code.App
     public class RaidSession : MonoBehaviour
     {
         [Header("Scenes")]
-        [SerializeField] private string lobbyScene = "Lobby";
-        [SerializeField] private string levelScene = "Level";
+        [Tooltip("The entry point: connecting happens here and nowhere else.")]
+        [SerializeField] private string menuScene = "Menu";
+
+        [Tooltip("Where players stand between raids and pick where to fly.")]
+        [SerializeField] private string hubScene = "Hub";
 
         [Header("Connection")]
         [Tooltip("Both ends use this. Over Tailscale the address is the other machine's " +
@@ -69,11 +72,11 @@ namespace _Game.Code.App
         [SerializeField] private float deadPeerTimeout = 8f;
 
         [Tooltip("How long a client may sit in a raid with no avatar of its own before " +
-                 "it gives up and returns to the lobby, seconds. Generous, because a " +
-                 "restart legitimately takes the avatar away for a scene load or two.")]
+                 "it gives up and returns to the menu, seconds. Generous, because a " +
+                 "flight legitimately takes the avatar away for a scene load or two.")]
         [SerializeField] private float orphanTimeout = 10f;
 
-        /// <summary>True once the raid has started and the lobby has closed.</summary>
+        /// <summary>True once a raid has started and the door on late join has closed.</summary>
         public bool IsRaidRunning { get; private set; }
 
         /// <summary>A connection attempt is in flight. The UI shows this as "connecting".</summary>
@@ -93,7 +96,7 @@ namespace _Game.Code.App
         private float _attemptDeadline;
 
         // We have been in a session at some point and have not been put back in the
-        // lobby yet. This is what the backstop in Update watches: a raid must not be
+        // menu yet. This is what the backstop in Update watches: a raid must not be
         // able to outlive the connection it belongs to.
         private bool _inSession;
 
@@ -106,7 +109,7 @@ namespace _Game.Code.App
 
         // Why the last session ended, when it ended without being asked to. Held rather
         // than raised as an event: it happens in the Level, and the only thing that can
-        // show it is the lobby's popup, which does not exist until a scene later. An
+        // show it is the menu's popup, which does not exist until a scene later. An
         // event would be shouted into an empty room.
         private string _notice;
 
@@ -274,7 +277,7 @@ namespace _Game.Code.App
                 return false;
             }
 
-            // Every candidate, not just the one shown in the lobby: with a VPN up the
+            // Every candidate, not just the one shown in the hub: with a VPN up the
             // best guess can still be the wrong one, and the player needs to be able to
             // try the next.
             // The timeout is in the line on purpose: when it is wrong, every symptom is
@@ -362,7 +365,7 @@ namespace _Game.Code.App
 
         /// <summary>
         /// Leave, whatever we are. A client disconnects and finds itself back in the
-        /// lobby through <see cref="OnClientConnectionState"/>; a host stops listening,
+        /// menu through <see cref="OnClientConnectionState"/>; a host stops listening,
         /// which does the same to everybody else. Host migration does not exist, and
         /// this is where that decision lives.
         /// </summary>
@@ -379,12 +382,12 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = false;
-            GoToLobbyAlone();
+            GoToMenuAlone();
         }
 
         /// <summary>
         /// Why the last session ended, if it ended on its own — and clears it, so it is
-        /// shown once and never again. Read by the lobby when it comes up, because that
+        /// shown once and never again. Read by the menu when it comes up, because that
         /// is the first moment there is anything on screen able to say it.
         ///
         /// Empty after a session the player ended themselves: being told "the connection
@@ -408,7 +411,7 @@ namespace _Game.Code.App
 
             if (LoadingScreen.Active != null)
             {
-                LoadingScreen.Active.RaidReady();
+                LoadingScreen.Active.AvatarReady();
             }
         }
 
@@ -438,55 +441,28 @@ namespace _Game.Code.App
         }
 
         /// <summary>
-        /// Take everybody into the level. The host's call, and the moment the lobby
-        /// closes: from here a new connection is refused rather than dropped into a
-        /// raid whose state it has no way of catching up with.
+        /// Take everybody into a location. The host's call, and the moment the door on
+        /// late join closes: from here a new connection is refused rather than dropped
+        /// into a raid whose state it has no way of catching up with.
         /// </summary>
-        public void StartRaid()
+        public void StartRaid(string locationScene)
         {
-            if (!IsHost)
+            if (!IsHost || string.IsNullOrEmpty(locationScene))
             {
                 return;
             }
 
             IsRaidRunning = true;
-            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
+            LoadForEveryone(locationScene, LoadingScreen.Wait.AvatarReady);
         }
 
         /// <summary>
-        /// Play it again. Reloading the scene is the whole reset: every latched thing —
-        /// the outcome, the delivered count, who is dead, which doors are open, where
-        /// the actors stand — is scene state, and LevelBootstrapper builds it from
-        /// scratch on the way in.
-        ///
-        /// It goes out through the lobby, and that is not a detour for the look of it.
-        /// **FishNet will not load a scene that is already loaded**: `CanLoadScene`
-        /// (Scened/SceneManager.cs) returns false for one that is, unless stacking is
-        /// allowed — and the same scene is protected from the replace-unload as well,
-        /// because it is in the load request's own name list. Asking for `Level` while
-        /// `Level` is open therefore does exactly nothing, which is what Restart used to
-        /// do (measured 2026-08-05). Two loads through a scene that is *not* the level
-        /// is the way round it: the queue runs them in order and each is judged when it
-        /// is its turn, so by then the level really is gone.
+        /// Everybody into the hub, with the session still up. Both the way in from the
+        /// menu and the way out of a finished raid — and, because the hub is a real
+        /// scene load, the way a lost raid is played again: everything latched is scene
+        /// state and the next flight builds it from scratch.
         /// </summary>
-        public void Restart()
-        {
-            if (!IsHost)
-            {
-                return;
-            }
-
-            // IsRaidRunning deliberately stays true across both loads. It is the door on
-            // late join, and dropping it here would open that door for the moment the
-            // lobby is on screen.
-            // Intermediate lobby stamped RaidReady too, so the screen does not lift on
-            // the way through.
-            LoadForEveryone(lobbyScene, LoadingScreen.Wait.RaidReady);
-            LoadForEveryone(levelScene, LoadingScreen.Wait.RaidReady);
-        }
-
-        /// <summary>Everybody back to the lobby, with the session still up.</summary>
-        public void ReturnToLobby()
+        public void GoToHub()
         {
             if (!IsHost)
             {
@@ -494,7 +470,7 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = false;
-            LoadForEveryone(lobbyScene, LoadingScreen.Wait.MainMenu);
+            LoadForEveryone(hubScene, LoadingScreen.Wait.AvatarReady);
         }
 
         // Through FishNet's own scene manager rather than Unity's: it is what carries
@@ -502,10 +478,8 @@ namespace _Game.Code.App
         // scene. ReplaceOption.All because a raid is not additive — the old scene must
         // be gone, or two levels' worth of actors exist at once.
         //
-        // destination is where the whole transition ends, not this load. Restart's Lobby
-        // is indistinguishable on the wire from ReturnToLobby's, and the server does not
-        // wait for clients between queued operations — without the stamp a client sits
-        // in the main menu for the whole of the server's Level load.
+        // destination is what the loading screen waits for; it travels because a client
+        // never calls these methods itself.
         private void LoadForEveryone(string sceneName, LoadingScreen.Wait destination)
         {
             var data = new SceneLoadData(sceneName);
@@ -519,27 +493,28 @@ namespace _Game.Code.App
 
         // Not through FishNet: by the time this runs we are not connected to anything,
         // so there is nobody to carry the load to.
-        private void GoToLobbyAlone()
+        private void GoToMenuAlone()
         {
             _inSession = false;
             _avatarLostAt = 0f;
             _hasAvatar = false;
 
-            // Also re-targets a screen still waiting for a raid that will never start.
+            // Also re-targets a screen still waiting for an avatar that will never arrive.
             if (LoadingScreen.Active != null)
             {
                 LoadingScreen.Active.Show(LoadingScreen.Wait.MainMenu);
             }
 
-            if (!string.IsNullOrEmpty(lobbyScene) && UnityScenes.GetActiveScene().name != lobbyScene)
+            if (!string.IsNullOrEmpty(menuScene) && UnityScenes.GetActiveScene().name != menuScene)
             {
-                UnityScenes.LoadScene(lobbyScene);
+                UnityScenes.LoadScene(menuScene);
             }
         }
 
-        // The roster is spawned rather than placed in the Lobby scene: it must not
+        // The roster is spawned rather than placed in the Menu scene: it must not
         // exist before anybody is hosting, and it is shared state, so the server has to
-        // be the one that creates it (MECHANICS.md 7.4).
+        // be the one that creates it (MECHANICS.md 7.4). Its prefab is global, so it
+        // outlives the menu the way the session itself does.
         private void OnServerConnectionState(ServerConnectionStateArgs args)
         {
             if (args.ConnectionState != LocalConnectionState.Started || lobbyRosterPrefab == null)
@@ -568,7 +543,7 @@ namespace _Game.Code.App
         }
 
         // Covers every way a client can end up disconnected — leaving on purpose, the
-        // host quitting, the network dropping — with one answer: you are in the lobby
+        // host quitting, the network dropping — with one answer: you are in the menu
         // now. Without this a dropped client would sit in a level nobody else is in.
         //
         // Stopped means two different things and the transport cannot tell them apart:
@@ -612,7 +587,7 @@ namespace _Game.Code.App
             }
 
             IsRaidRunning = false;
-            GoToLobbyAlone();
+            GoToMenuAlone();
         }
 
         private void Update()
@@ -628,15 +603,15 @@ namespace _Game.Code.App
             {
                 IsRaidRunning = false;
                 _notice = "Connection lost";
-                GoToLobbyAlone();
+                GoToMenuAlone();
                 return;
             }
 
-            // A connection the server never spawned for: no camera, no HUD, so no
-            // EndScreenUI and no way out. Armed off the level scene, so Restart's lobby
-            // leg does not start the clock.
+            // A connection the server never spawned for: no camera, no HUD, so no menu
+            // and no way out. Every scene but the menu spawns avatars, and there will be
+            // more than one location — so the test is "not the menu", not a scene name.
             if (_inSession && !IsHost && !_hasAvatar && _avatarLostAt <= 0f &&
-                UnityScenes.GetActiveScene().name == levelScene)
+                UnityScenes.GetActiveScene().name != menuScene)
             {
                 _avatarLostAt = Time.unscaledTime;
             }
@@ -647,9 +622,9 @@ namespace _Game.Code.App
             if (_avatarLostAt > 0f && !IsConnecting && Time.unscaledTime - _avatarLostAt > orphanTimeout)
             {
                 Debug.LogWarning($"RaidSession: no avatar for {orphanTimeout} s and no new one arriving — " +
-                                 "treating the session as over and returning to the lobby.");
+                                 "treating the session as over and returning to the menu.");
 
-                // Set before Leave, which goes through GoToLobbyAlone and would otherwise
+                // Set before Leave, which goes through GoToMenuAlone and would otherwise
                 // look exactly like the player having chosen to leave.
                 _notice = "Game ended by host";
                 Leave();

@@ -68,8 +68,9 @@ stop at the first hit. Same shape as the "write the minimum that works" ladder i
   tells the session, never the reverse. Call down, raise up: a parent calls its children directly,
   a child raises an event or calls through a registered interface rather than naming its parent's
   type.
-- **The two bootstrappers are the composition roots.** Wiring is a serialized reference or the
-  entry point's properties. There is no DI container and no service locator in this project — do
+- **The three bootstrappers are the composition roots** — `Bootstrapper` (the app),
+  `HubBootstrapper`, `LevelBootstrapper`. Wiring is a serialized reference or the entry point's
+  properties. There is no DI container and no service locator in this project — do
   not add one without saying so first.
 - **Static `Current` / `Active` are lookups, not services.** Get-only, set in `Awake` or
   `OnStartClient`, cleared in `OnDestroy`, and null means "playing alone" rather than failure.
@@ -173,7 +174,8 @@ inventing a parallel mechanism.
   trigger differs.
 - **Replicated state lives on its own server-spawned prefab and the scene object holds a plain
   reference** — `RaidState`, `LobbyRoster`. Never promote a scene object to `NetworkBehaviour`.
-- **One writer per piece of state.** `Cursor.lockState` has exactly two and they are named; the
-  outcome text has exactly one. A second writer is a bug.
+- **One writer per piece of state, and every writer is named.** `Cursor.lockState` has exactly
+  three — `LocalAvatar`, `EndScreenUI`, `HubMenuUI` — and the outcome text has exactly one. An
+  unnamed writer is a bug; adding a named one is a documented decision, not a free action.
 - **Whatever switches something off is what switches it back on, and restores only what it
   changed** — `EndScreenUI.suspendWhileOpen`, `FirstPersonBody`.

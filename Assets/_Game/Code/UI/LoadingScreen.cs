@@ -10,13 +10,12 @@ namespace _Game.Code.UI
     /// <see cref="App.Bootstrapper"/>: it is shown in one scene and hidden after
     /// another has loaded.
     ///
-    /// Told what to wait for, not when to stop — there is no public Hide. Restart
-    /// queues Lobby then Level and the server does not wait for clients between queued
-    /// operations, so hiding on "a scene loaded" would show the main menu mid-restart.
+    /// Told what to wait for, not when to stop — there is no public Hide: hiding on "a
+    /// scene loaded" would uncover a scene that is loaded but not yet playable.
     ///
     /// Screen Space – Overlay draws without a camera, which is why this survives the
-    /// camera-less Loading scene and the gap between levels. Does not touch
-    /// <see cref="Cursor"/> — see CLAUDE.md, there are exactly two writers of it.
+    /// camera-less Loading scene and the gap between scenes. Does not touch
+    /// <see cref="Cursor"/> — see CLAUDE.md, its writers are named there.
     /// </summary>
     public class LoadingScreen : MonoBehaviour
     {
@@ -24,7 +23,7 @@ namespace _Game.Code.UI
         public enum Wait : byte
         {
             MainMenu = 0,
-            RaidReady = 1
+            AvatarReady = 1
         }
 
         [SerializeField] private Image _loadingIcon;
@@ -46,7 +45,7 @@ namespace _Game.Code.UI
 
         private Wait _waitingFor;
         private bool _showing;
-        private bool _raidReady;
+        private bool _avatarReady;
         private float _deadline;
 
         private void Awake()
@@ -104,7 +103,7 @@ namespace _Game.Code.UI
             }
 
             _waitingFor = what;
-            _raidReady = false;
+            _avatarReady = false;
             _showing = true;
             _deadline = Time.unscaledTime + _stuckTimeout;
 
@@ -112,10 +111,10 @@ namespace _Game.Code.UI
             _canvasGroup.blocksRaycasts = true;
         }
 
-        /// <summary>Our avatar has arrived: the raid is playable, not merely loaded.</summary>
-        public void RaidReady()
+        /// <summary>Our avatar has arrived: the scene is playable, not merely loaded.</summary>
+        public void AvatarReady()
         {
-            _raidReady = true;
+            _avatarReady = true;
         }
 
         // Fires on every peer, which is the point: a client never calls StartRaid.
@@ -130,11 +129,11 @@ namespace _Game.Code.UI
             Show((Wait)stamp[0]);
         }
 
-        // LobbyUI.Current, not SceneManager.sceneLoaded: FishNet raises OnLoadStart even
+        // MenuView.Current, not SceneManager.sceneLoaded: FishNet raises OnLoadStart even
         // for a scene it then skips as already loaded, and no sceneLoaded follows.
         private bool Satisfied(Wait what)
         {
-            return what == Wait.MainMenu ? LobbyUI.Current != null : _raidReady;
+            return what == Wait.MainMenu ? MenuView.Current != null : _avatarReady;
         }
 
         private void Update()

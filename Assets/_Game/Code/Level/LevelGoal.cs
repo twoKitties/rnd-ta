@@ -51,12 +51,19 @@ namespace _Game.Code.Level
         public bool IsWon => Shared == null ? _isWon : Shared.IsWon;
         public bool IsLost => Shared == null ? _isLost : Shared.IsLost;
 
-        // The same four, for a level played with no networking at all. One of the two
+        /// <summary>How long the raid took, seconds. Meaningful once it is over.</summary>
+        public float Duration => Shared == null ? _duration : Shared.Duration;
+
+        // The same five, for a level played with no networking at all. One of the two
         // sets is live at a time and the properties above pick which.
         private int _delivered;
         private int _total;
         private bool _isWon;
         private bool _isLost;
+        private float _duration;
+
+        // When this raid started, for the duration above. Set where the counters are.
+        private float _startedAt;
 
         // Whether the animal count has been handed to RaidState yet. It cannot be done
         // in Bind: the object is spawned in the same frame and does not exist for us
@@ -94,6 +101,7 @@ namespace _Game.Code.Level
             _total = pets == null ? 0 : pets.Count;
             _delivered = 0;
             _totalPushed = false;
+            _startedAt = Time.time;
         }
 
         /// <summary>
@@ -251,6 +259,7 @@ namespace _Game.Code.Level
             {
                 _isWon = won;
                 _isLost = lost;
+                _duration = Time.time - _startedAt;
             }
             else
             {

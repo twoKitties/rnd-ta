@@ -52,12 +52,18 @@ namespace _Game.Code.Player
             }
 
             // Registered from the avatar rather than by whoever created it, for the
-            // same reason: three of the four were not created here at all. The level's
+            // same reason: three of the four were not created here at all. The scene's
             // entry point exists on every peer, so both the AI's view of the players
-            // and the outcome's list are filled the same way everywhere.
+            // and the outcome's list are filled the same way everywhere. Exactly one of
+            // the two is ever non-null — an avatar stands either in the hub or in a raid.
             if (LevelBootstrapper.Current != null)
             {
                 LevelBootstrapper.Current.AddPlayer(gameObject);
+            }
+
+            if (Hub.HubBootstrapper.Current != null)
+            {
+                Hub.HubBootstrapper.Current.AddPlayer(gameObject);
             }
         }
 
@@ -73,6 +79,11 @@ namespace _Game.Code.Player
             if (LevelBootstrapper.Current != null)
             {
                 LevelBootstrapper.Current.RemovePlayer(gameObject);
+            }
+
+            if (Hub.HubBootstrapper.Current != null)
+            {
+                Hub.HubBootstrapper.Current.RemovePlayer(gameObject);
             }
         }
 

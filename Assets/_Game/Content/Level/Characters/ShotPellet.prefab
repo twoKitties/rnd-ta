@@ -103,9 +103,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1f02d020be07d943b86208c0cbc5d8b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.OldMan.ShotPellet
-  speed: 10
+  speed: 12.5
   hitRadius: 0.25
-  maxDistance: 20
+  maxDistance: 30
   blockers:
     serializedVersion: 2
     m_Bits: 640

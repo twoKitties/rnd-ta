@@ -1199,6 +1199,8 @@ MonoBehaviour:
   carryPose: 1
   captureDistance: 1.5
   dropDistance: 0.6
+  riseDuration: 3
+  riseTargetOffset: {x: 0, y: -2.5, z: 0}
   groundMask:
     serializedVersion: 2
     m_Bits: 192

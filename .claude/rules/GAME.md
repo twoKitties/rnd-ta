@@ -1,10 +1,4 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-`rnd-ta` is a co-op stealth game: a group of 2–4 players, aliens flying a saucer, land at a house and try to steal the pets living there. This repo **is** the Unity project (no sub-projects) — so this file is both the convention doc and the rulebook. Read it before touching code, scenes, or assets.
-
-## The game
+# The game
 
 - **Hub** — the flying saucer the players start from and return to.
 - **Level** — the house they raid.

@@ -18,14 +18,14 @@ rnd-ta/
 │   └── agents/                 ← the three read-only reviewers
 ├── Assets/
 │   ├── _Game/                  ← everything WE author
-│   │   ├── Code/               ← gameplay scripts, one folder per system
-│   │   │   ├── LevelBootstrapper.cs ← the level's entry point
+│   │   ├── Code/               ← gameplay scripts, one folder per system; namespace mirrors the folder
 │   │   │   ├── App/            ← Bootstrapper.cs (the app's entry point), RaidSession.cs, LobbyRoster.cs, ServerSimulated.cs
 │   │   │   ├── AI/             ← Sight.cs, Hearing.cs, DoorGate.cs, SensedPlayer.cs — shared by every brain
 │   │   │   ├── Audio/          ← FootstepAudio.cs, FootstepBank.cs, FootstepSurface.cs
 │   │   │   ├── Doors/          ← Door.cs, DoorState.cs
+│   │   │   ├── Editor/         ← SceneMenu.cs (Tools → Scenes); editor-only, stripped from builds
 │   │   │   ├── Hub/            ← HubBootstrapper.cs (the hub's entry point), HubMenuUI.cs, RaidLocation.cs
-│   │   │   ├── Level/          ← BeamZone.cs, LevelGoal.cs, RaidState.cs, UfoDrift.cs
+│   │   │   ├── Level/          ← LevelBootstrapper.cs (the level's entry point), BeamZone.cs, LevelGoal.cs, RaidState.cs, UfoDrift.cs
 │   │   │   ├── Noise/          ← NoiseEmitter.cs
 │   │   │   ├── OldMan/         ← OldManBrain.cs, ShotFlash.cs, RifleRig.cs, ShotPellet.cs
 │   │   │   ├── Pets/           ← Pet.cs, PetBrain.cs, PetVoice.cs
@@ -56,8 +56,8 @@ rnd-ta/
 - **`Assets/_Game/`, `Assets/Settings/` and `Assets/InputSystem_Actions.inputactions` are ours; every other *folder* directly under `Assets/` is an imported pack** — run `ls Assets/` for the current set, it grows with almost every art commit. Treat pack folders as read-only: don't edit or reorganize them, because a reimport wipes the changes. To adapt a pack asset, make a prefab variant or a copy inside `Assets/_Game/`.
 - New gameplay code goes in `Assets/_Game/Code/`. New level content goes in `Assets/_Game/Content/`.
 - **Every doc lives in `.claude/rules/`; the repo root holds no markdown** (moved 2026-08-20). `GAME.md` is the design vocabulary and the history of measured failures, `DD.md` the concept, `MECHANICS.md` the tunables, `NETCODE.md` the replication map, `CODESTYLE.md` the code rules, `TASKS.MD` the user's own task board.
-- **Three scenes have an entry point and each is a scene root named `Bootstrapper`**: `Code/App/Bootstrapper.cs` in `Loading`, `Code/Hub/HubBootstrapper.cs` in `Hub`, `Code/LevelBootstrapper.cs` in `Level`. The flow is `Loading → Menu → Hub → Level → Hub`; `Menu.unity` is the renamed former `Lobby.unity` (same GUID) and is only the way in. Details in `GAME.md`, channels in `NETCODE.md`.
-- **`Content/Lobby/` is deliberately unused.** `PlayerLobby.prefab` and `PlayerLobbyUI.cs` outlived the lobby's player list and are kept for the hub's own list; nothing shows them today.
+- **Three scenes have an entry point and each is a scene root named `Bootstrapper`**: `Code/App/Bootstrapper.cs` in `Loading`, `Code/Hub/HubBootstrapper.cs` in `Hub`, `Code/Level/LevelBootstrapper.cs` in `Level`. **A scene's entry point lives in that scene's folder**, so `App/` keeps only what outlives every scene. The flow is `Loading → Menu → Hub → Level → Hub`; `Menu.unity` is the renamed former `Lobby.unity` (same GUID) and is only the way in. Details in `GAME.md`, channels in `NETCODE.md`.
+- **`Content/Lobby/` is deliberately unused since 2026-08-12.** `PlayerLobby.prefab` and `PlayerLobbyUI.cs` outlived the lobby's player list and are kept for the hub's own list; nothing shows them today.
 
 ## Project facts
 

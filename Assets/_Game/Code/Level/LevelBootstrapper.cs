@@ -1,20 +1,19 @@
 using System.Collections.Generic;
-using FishNet;
-using FishNet.Connection;
-using FishNet.Managing.Scened;
-using FishNet.Object;
-using FishNet.Transporting;
 using _Game.Code.AI;
-using _Game.Code.Level;
 using _Game.Code.Noise;
 using _Game.Code.OldMan;
 using _Game.Code.Pets;
 using _Game.Code.Player;
 using _Game.Code.Spawning;
 using _Game.Code.UI;
+using FishNet;
+using FishNet.Connection;
+using FishNet.Managing.Scened;
+using FishNet.Object;
+using FishNet.Transporting;
 using UnityEngine;
 
-namespace _Game.Code
+namespace _Game.Code.Level
 {
     /// <summary>
     /// The level's entry point. Every reference the level needs at startup is wired
@@ -24,10 +23,10 @@ namespace _Game.Code
     /// Every actor in play is spawned from a prefab here, so systems must take them
     /// from this component rather than looking them up by name or type
     /// (MECHANICS.md 7.6) — an actor that does not exist until Awake cannot be
-    /// referenced by another prefab up front.
+    /// referenced by another prefab up front.  
     ///
     /// Named for the level on purpose: the application's own entry point is
-    /// <see cref="App.LevelBootstrapper"/> in the Loading scene, and it is a different
+    /// <see cref="LevelBootstrapper"/> in the Loading scene, and it is a different
     /// thing with a different lifetime — this one dies with the raid.
     /// </summary>
     public class LevelBootstrapper : MonoBehaviour

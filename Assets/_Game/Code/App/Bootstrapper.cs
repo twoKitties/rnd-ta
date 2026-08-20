@@ -9,8 +9,8 @@ namespace _Game.Code.App
     /// the Loading scene, which holds nothing else.
     ///
     /// Its whole job is to make sure the things that must outlive a scene exist, and
-    /// then hand over to the menu. It is not <see cref="_Game.Code.LevelBootstrapper"/>
-    /// — that one wires up one raid and dies with it, while this runs once per launch.
+    /// then hand over to the menu. Not to be confused with LevelBootstrapper, which
+    /// wires up one raid and dies with it, while this runs once per launch.
     ///
     /// The network manager is instantiated here rather than placed in the Menu scene
     /// because it has to survive Menu → Hub → Level → Hub. Guarded on "does one already

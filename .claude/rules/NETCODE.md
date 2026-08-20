@@ -34,7 +34,7 @@ FishNet, транспорт Tugboat (LiteNetLib). Ставится через `P
 
 | Механика | Классы | Синхронизация |
 | --- | --- | --- |
-| Расстановка акторов | `Code/LevelBootstrapper.cs`, `Code/Spawning/ActorSpawner.cs` | **`ServerManager.Spawn`**: аватар — с `connection` (владелец), животные / Old Man / `RaidState` — без владельца. Клиент не создаёт ничего. Без сети — `nob.SetIsNetworked(false)`, иначе FishNet выключит объект |
+| Расстановка акторов | `Code/Level/LevelBootstrapper.cs`, `Code/Spawning/ActorSpawner.cs` | **`ServerManager.Spawn`**: аватар — с `connection` (владелец), животные / Old Man / `RaidState` — без владельца. Клиент не создаёт ничего. Без сети — `nob.SetIsNetworked(false)`, иначе FishNet выключит объект |
 | «Этот аватар — мой» | `Code/Player/LocalAvatar.cs` | **Владение `NetworkObject`** (`IsOwner` в `OnStartClient`). По проводу ничего; включается список локальных компонентов — камера, `AudioListener`, HUD, ввод |
 | «Этого актора считает только сервер» | `Code/App/ServerSimulated.cs` (Dog / Kitty / Parrot / Old Man) | **Канала нет:** на не-серверных пирах гасится список `Behaviour` — мозг и `NavMeshAgent`. Гейт — список ссылок на префабе, а не ветка внутри AI-кода |
 | Счётчики рейда, исход и длительность | `Code/Level/RaidState.cs` (спавнится сервером); правила — `Code/Level/LevelGoal.cs`, обычный `MonoBehaviour` | **Пять `SyncVar`**: `_delivered`, `_total`, `_isWon`, `_isLost`, `_duration`. Длительность пишется сервером один раз, в `SetOutcome`, и отсчитывается от `OnStartServer` — время жизни этого объекта и есть рейд. `LevelGoal` читает `RaidState.Current`, а без сети — собственные поля |

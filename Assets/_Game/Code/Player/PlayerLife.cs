@@ -144,6 +144,12 @@ namespace _Game.Code.Player
                 }
             }
 
+            var animator = GetComponent<PlayerAnimator>();
+            if (animator != null)
+            {
+                animator.Die();
+            }
+
             for (var i = 0; i < disableOnDeath.Length; i++)
             {
                 // Unity object: a destroyed one compares == null but is not a real null,

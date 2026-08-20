@@ -37,6 +37,27 @@ namespace _Game.Code.OldMan
                  "of sight, so cover against being seen is cover against being shot.")]
         [SerializeField] private LayerMask blockers;
 
+        [Header("Impact")]
+        [Tooltip("Spawned at the point it stops, aligned to the surface (or, on a " +
+                 "player hit, facing back along the shot). No DecalProjector: URP's " +
+                 "renderer assets carry no Decal Renderer Feature in this project. " +
+                 "Its own AudioSource plays the impact clip — 3D, Logarithmic, same " +
+                 "min 3 / max 60 as the shot's own source (MECHANICS.md section 2) — " +
+                 "so the rolloff is set on the prefab, the same idiom as every other " +
+                 "sound in this project, not passed in code.")]
+        [SerializeField] private GameObject hitMarkPrefab;
+
+        [Tooltip("Nudge along the normal so the mark does not z-fight the surface it " +
+                 "sits on, world m.")]
+        [SerializeField] private float hitMarkOffset = 0.01f;
+
+        [Tooltip("Seconds before the spawned mark is destroyed.")]
+        [SerializeField] private float hitMarkLifetime = 8f;
+
+        [Tooltip("Played once, through hitMarkPrefab's own AudioSource, at full " +
+                 "volume — the same way ShotFlash plays the bang.")]
+        [SerializeField] private AudioClip impactClip;
+
         private Vector3 _direction;
         private float _flown;
         private bool _armed;
@@ -70,11 +91,15 @@ namespace _Game.Code.OldMan
             if (Physics.Raycast(transform.position, _direction, out wall, step, blockers,
                     QueryTriggerInteraction.Ignore))
             {
+                SpawnImpact(wall.point, wall.normal);
                 Destroy(gameObject);
                 return;
             }
 
-            if (_armed && HitPlayer(step))
+            // Tested on every peer, not only the armed one: the mark and the thud
+            // are the only thing a victim ever sees of the shot, and a client whose
+            // pellet flew on would see it strike the wall behind them instead.
+            if (HitPlayer(step))
             {
                 Destroy(gameObject);
                 return;
@@ -92,7 +117,8 @@ namespace _Game.Code.OldMan
         /// <summary>
         /// A capsule-middle proximity test against this frame's flight segment, not
         /// physics: the player list is already in hand (MECHANICS.md 7.6), and the
-        /// avatar's capsule middle is the same point his sight aims at.
+        /// avatar's capsule middle is the same point his sight aims at. Runs on every
+        /// peer for the picture; only the armed copy kills.
         /// </summary>
         private bool HitPlayer(float step)
         {
@@ -118,12 +144,51 @@ namespace _Game.Code.OldMan
                     continue;
                 }
 
-                player.Kill();
-                Debug.Log($"{name} hit {player.Transform.name} (MECHANICS.md 5.2).");
+                // Killing stays the armed copy's alone; the death reaches everyone
+                // else through PlayerLife's replicated flag.
+                if (_armed)
+                {
+                    player.Kill();
+                    Debug.Log($"{name} hit {player.Transform.name} (MECHANICS.md 5.2).");
+                }
+
+                // No surface normal on a player hit — the mark faces back along the
+                // shot, toward the muzzle it came from.
+                SpawnImpact(transform.position + _direction * along, -_direction);
                 return true;
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The mark: aligned to <paramref name="normal"/>, nudged off the surface to
+        /// avoid z-fighting, destroyed after its own lifetime. Its own AudioSource
+        /// plays the thud once — not AudioSource.PlayClipAtPoint, which would spin up
+        /// a source with Unity's defaults instead of the rolloff set on the prefab.
+        /// Runs on every peer — the pellet already does, no netcode added.
+        /// </summary>
+        private void SpawnImpact(Vector3 point, Vector3 normal)
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (hitMarkPrefab == null)
+            {
+                return;
+            }
+
+            var mark = Instantiate(hitMarkPrefab, point + normal * hitMarkOffset,
+                Quaternion.LookRotation(normal));
+
+            if (impactClip != null)
+            {
+                var markSource = mark.GetComponent<AudioSource>();
+                if (markSource != null)
+                {
+                    markSource.PlayOneShot(impactClip);
+                }
+            }
+
+            Destroy(mark, hitMarkLifetime);
         }
     }
 }

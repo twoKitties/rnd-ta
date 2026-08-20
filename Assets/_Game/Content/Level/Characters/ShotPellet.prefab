@@ -109,3 +109,7 @@ MonoBehaviour:
   blockers:
     serializedVersion: 2
     m_Bits: 640
+  hitMarkPrefab: {fileID: 2648715794556851016, guid: 6c61163e6f9c76e459ebee3f8df037bf, type: 3}
+  hitMarkOffset: 0.01
+  hitMarkLifetime: 8
+  impactClip: {fileID: 0}

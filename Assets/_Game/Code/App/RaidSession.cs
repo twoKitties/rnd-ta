@@ -116,6 +116,9 @@ namespace _Game.Code.App
         /// <summary>True on the machine that is hosting — the one that owns the rules.</summary>
         public bool IsHost => InstanceFinder.IsServerStarted;
 
+        /// <summary>The port this build hosts on. Read by the LAN beacon, which announces it.</summary>
+        public ushort Port => port;
+
         /// <summary>
         /// The address to read out to the other players, as <c>ip:port</c>.
         ///

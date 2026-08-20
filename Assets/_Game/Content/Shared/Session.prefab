@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 3589493558854392414}
   - component: {fileID: 992482677970670414}
   - component: {fileID: 595416185525235681}
+  - component: {fileID: 5225626390798384436}
   m_Layer: 0
   m_Name: Session
   m_TagString: Untagged
@@ -91,3 +92,22 @@ MonoBehaviour:
   port: 7770
   hostAddress: 127.0.0.1
   lobbyRosterPrefab: {fileID: 5182059135105534431, guid: 9e297224c66152642aab6e3423ef8d13, type: 3}
+  connectTimeout: 8
+  deadPeerTimeout: 8
+  orphanTimeout: 10
+--- !u!114 &5225626390798384436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4323903077379937797}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3b9ebceffc603b4eb4a114039e002b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.App.LanDiscovery
+  discoveryPort: 47770
+  announceInterval: 1
+  entryTimeout: 4
+  fallbackGamePort: 7770

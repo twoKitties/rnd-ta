@@ -26,7 +26,8 @@ namespace _Game.Code.UI
         private enum LobbyStep
         {
             Options,
-            Address
+            Address,
+            Search
         }
 
         [SerializeField] private Button _playButton;
@@ -68,6 +69,26 @@ namespace _Game.Code.UI
                  "seconds reads as a bug.")]
         [SerializeField] private GameObject _connectingIndicator;
 
+        [Header("Search")]
+        [Tooltip("Opens the search step from Options.")]
+        [SerializeField] private Button _searchButton;
+
+        [Tooltip("The list of hosts found on the LAN. LobbyPanel/Search.")]
+        [SerializeField] private GameObject _searchPanel;
+
+        [Tooltip("Back from the search step. Leaving it stops the beacon listener.")]
+        [SerializeField] private Button _backSearchButton;
+
+        [Tooltip("One row per host. Needs a Button on the root and a Text anywhere under it.")]
+        [SerializeField] private Button _sessionRowPrefab;
+
+        [Tooltip("Rows are instantiated under this — the content object of the scroll view.")]
+        [SerializeField] private Transform _sessionRowContainer;
+
+        [Tooltip("Says whether anything was heard. An empty list with no line reads as a " +
+                 "broken screen, and a blocked broadcast is exactly that case.")]
+        [SerializeField] private Text _searchStatusText;
+
         [Header("Popup")]
         [SerializeField] private GameObject _popup;
         [SerializeField] private Text _popupText;
@@ -75,7 +96,14 @@ namespace _Game.Code.UI
 
         private readonly Dictionary<Panel, CanvasGroup> _panels = new();
 
+        private readonly List<Button> _sessionRows = new();
+
         private RaidSession _session;
+
+        private LanDiscovery _discovery;
+
+        // Where a failed attempt puts the player back — the step the dial came from.
+        private LobbyStep _dialledFrom = LobbyStep.Address;
 
         /// <summary>
         /// The menu while it is on screen. Read by <see cref="LoadingScreen"/> as "is
@@ -104,6 +132,16 @@ namespace _Game.Code.UI
             if (_backAddressButton != null)
             {
                 _backAddressButton.onClick.AddListener(BackFromAddress);
+            }
+
+            if (_searchButton != null)
+            {
+                _searchButton.onClick.AddListener(OpenSearchStep);
+            }
+
+            if (_backSearchButton != null)
+            {
+                _backSearchButton.onClick.AddListener(BackFromSearch);
             }
 
             if (_popupOkButton != null)
@@ -158,12 +196,23 @@ namespace _Game.Code.UI
                 _backAddressButton.onClick.RemoveAllListeners();
             }
 
+            if (_searchButton != null)
+            {
+                _searchButton.onClick.RemoveAllListeners();
+            }
+
+            if (_backSearchButton != null)
+            {
+                _backSearchButton.onClick.RemoveAllListeners();
+            }
+
             if (_popupOkButton != null)
             {
                 _popupOkButton.onClick.RemoveAllListeners();
             }
 
             UnsubscribeSession();
+            StopSearching();
 
             if (Current == this)
             {
@@ -180,6 +229,7 @@ namespace _Game.Code.UI
             }
 
             SubscribeSession(session);
+            _dialledFrom = LobbyStep.Options;
             if (session.Host())
             {
                 ShowConnecting(true);
@@ -197,6 +247,38 @@ namespace _Game.Code.UI
             ShowStep(LobbyStep.Options);
         }
 
+        private void OpenSearchStep()
+        {
+            ShowStep(LobbyStep.Search);
+        }
+
+        private void BackFromSearch()
+        {
+            ShowStep(LobbyStep.Options);
+        }
+
+        private void JoinFound(string endpoint)
+        {
+            var session = RequireSession();
+            if (session == null)
+            {
+                return;
+            }
+
+            SubscribeSession(session);
+            _dialledFrom = LobbyStep.Search;
+            if (!session.Join(endpoint))
+            {
+                return;
+            }
+
+            ShowConnecting(true);
+
+            // Stops the rows repainting under the cursor, so a second row cannot start a
+            // second attempt on top of the first.
+            StopSearching();
+        }
+
         private void Connect()
         {
             var session = RequireSession();
@@ -206,6 +288,7 @@ namespace _Game.Code.UI
             }
 
             SubscribeSession(session);
+            _dialledFrom = LobbyStep.Address;
             if (session.Join(_addressField == null ? string.Empty : _addressField.text))
             {
                 ShowConnecting(true);
@@ -268,9 +351,9 @@ namespace _Game.Code.UI
         {
             ShowConnecting(false);
 
-            // Back to where the address was typed, so it can be corrected rather than
-            // retyped from the start.
-            ShowStep(LobbyStep.Address);
+            // Back to the step the attempt started from: the typed address stays
+            // correctable, and a LAN row lands back on the list rather than on a form.
+            ShowStep(_dialledFrom);
             ShowPopup(reason);
         }
 
@@ -286,10 +369,111 @@ namespace _Game.Code.UI
                 _addressPanel.SetActive(step == LobbyStep.Address);
             }
 
+            if (_searchPanel != null)
+            {
+                _searchPanel.SetActive(step == LobbyStep.Search);
+            }
+
             if (_playersPanel != null)
             {
                 _playersPanel.SetActive(false);
             }
+
+            // The listener is bound to the step, not to the panel: every way out of it —
+            // Back, a row, a failed attempt, leaving the lobby — comes through here.
+            if (step == LobbyStep.Search)
+            {
+                StartSearching();
+            }
+            else
+            {
+                StopSearching();
+            }
+        }
+
+        private void StartSearching()
+        {
+            if (_discovery != null)
+            {
+                return;
+            }
+
+            if (LanDiscovery.Active == null)
+            {
+                Debug.LogError("MenuView: no LanDiscovery on the session object, nothing can be found.");
+                if (_searchStatusText != null)
+                {
+                    _searchStatusText.text = "Поиск недоступен";
+                }
+
+                return;
+            }
+
+            _discovery = LanDiscovery.Active;
+            _discovery.Changed += RepaintSessions;
+            _discovery.StartSearch();
+            RepaintSessions();
+        }
+
+        private void StopSearching()
+        {
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (_discovery == null)
+            {
+                return;
+            }
+
+            _discovery.Changed -= RepaintSessions;
+            _discovery.StopSearch();
+            _discovery = null;
+            ClearSessionRows();
+        }
+
+        private void RepaintSessions()
+        {
+            ClearSessionRows();
+
+            var sessions = _discovery == null ? null : _discovery.Sessions;
+            var count = sessions == null ? 0 : sessions.Count;
+
+            if (_searchStatusText != null)
+            {
+                _searchStatusText.text = count == 0 ? "Поиск сессий…" : $"Найдено: {count}";
+            }
+
+            if (_sessionRowPrefab == null || _sessionRowContainer == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                var endpoint = sessions[i].Endpoint;
+                // worldPositionStays false, or the row keeps the prefab's world rect and
+                // the layout group under the container gets a torn first frame.
+                var row = Instantiate(_sessionRowPrefab, _sessionRowContainer, false);
+                var label = row.GetComponentInChildren<Text>();
+                if (label != null)
+                {
+                    label.text = endpoint;
+                }
+
+                row.onClick.AddListener(() => JoinFound(endpoint));
+                _sessionRows.Add(row);
+            }
+        }
+
+        private void ClearSessionRows()
+        {
+            for (var i = 0; i < _sessionRows.Count; i++)
+            {
+                if (_sessionRows[i] != null)
+                {
+                    Destroy(_sessionRows[i].gameObject);
+                }
+            }
+
+            _sessionRows.Clear();
         }
 
         private void ShowConnecting(bool connecting)
@@ -343,9 +527,12 @@ namespace _Game.Code.UI
             _panels.Add(Panel.Main, _mainMenuPanel);
         }
 
+        // Resets the step as well: a hidden lobby panel would otherwise leave the beacon
+        // listener bound with nothing on screen.
         private void OpenMainMenu()
         {
             SelectPanel(Panel.Main);
+            ShowStep(LobbyStep.Options);
         }
 
         private void OpenLobby()

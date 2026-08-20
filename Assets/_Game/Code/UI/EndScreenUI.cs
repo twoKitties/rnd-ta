@@ -30,14 +30,18 @@ namespace _Game.Code.UI
 
         [SerializeField] private Text title;
 
+        [Tooltip("How the raid went. Filled in once, when it ends.")]
+        [SerializeField] private Text stats;
+
         [Tooltip("Mid-raid only: closes the panel again. There is nothing to resume " +
                  "once the raid is over, so it is hidden then.")]
         [SerializeField] private Button resumeButton;
 
-        [Tooltip("Host only, and only once the raid is over. Reloads Level for everybody.")]
-        [SerializeField] private Button restartButton;
+        [Tooltip("Host only, and only once the raid is over. Takes everybody back to " +
+                 "the hub, which is also how a lost raid is played again.")]
+        [SerializeField] private Button hubButton;
 
-        [Tooltip("The host takes everybody back to the lobby; anybody else leaves alone.")]
+        [Tooltip("The host ends the session; anybody else leaves alone.")]
         [SerializeField] private Button leaveButton;
 
         [Tooltip("Switched off while the panel is up: PlayerController and " +
@@ -52,6 +56,7 @@ namespace _Game.Code.UI
         private LevelGoal _goal;
         private InputSystem_Actions _input;
         private bool _open;
+        private bool _summarised;
         private string _shownTitle;
 
         private void Awake()
@@ -64,16 +69,21 @@ namespace _Game.Code.UI
                 panel.SetActive(false);
             }
 
-            // Wired here rather than in the inspector, the same way LobbyUI does it:
+            if (stats != null)
+            {
+                stats.gameObject.SetActive(false);
+            }
+
+            // Wired here rather than in the inspector, the same way MenuView does it:
             // a missing UnityEvent is silent, a missing reference here is not.
             if (resumeButton != null)
             {
                 resumeButton.onClick.AddListener(Resume);
             }
 
-            if (restartButton != null)
+            if (hubButton != null)
             {
-                restartButton.onClick.AddListener(Restart);
+                hubButton.onClick.AddListener(ToHub);
             }
 
             if (leaveButton != null)
@@ -138,12 +148,22 @@ namespace _Game.Code.UI
 
         private void Update()
         {
-            var won = _goal != null && _goal.IsWon;
-            var lost = _goal != null && _goal.IsLost;
+            // No goal means this avatar is not in a raid — it is standing in the hub,
+            // where Escape belongs to HubMenuUI. Two panels on one key would also make
+            // two of them write the cursor.
+            // Unity object: a destroyed one compares == null but is not a real null.
+            if (_goal == null)
+            {
+                return;
+            }
+
+            var won = _goal.IsWon;
+            var lost = _goal.IsLost;
 
             if (won || lost)
             {
                 // Terminal: the raid does not un-end, so this cannot be dismissed.
+                Summarise();
                 SetOpen(true);
                 Paint(won ? "RAID COMPLETE" : "RAID FAILED", true);
                 return;
@@ -227,10 +247,9 @@ namespace _Game.Code.UI
             _suspended.Clear();
         }
 
-        // Which buttons a raid in this state offers. Restart belongs to the host and
-        // only once there is something to restart; Resume only while there is something
-        // to go back to; Leaving is everybody's, always — that is the whole "exit at
-        // any moment".
+        // Which buttons a raid in this state offers. The hub belongs to the host and
+        // only once the raid is over; Resume only while there is something to go back
+        // to; Leaving is everybody's, always — that is the whole "exit at any moment".
         private void Paint(string text, bool over)
         {
             var session = RaidSession.Active;
@@ -240,9 +259,9 @@ namespace _Game.Code.UI
                 resumeButton.gameObject.SetActive(!over);
             }
 
-            if (restartButton != null)
+            if (hubButton != null)
             {
-                restartButton.gameObject.SetActive(over && session != null && session.IsHost);
+                hubButton.gameObject.SetActive(over && session != null && session.IsHost);
             }
 
             if (leaveButton != null)
@@ -266,15 +285,50 @@ namespace _Game.Code.UI
             SetOpen(false);
         }
 
-        private void Restart()
+        // Counted once, when the raid ends: Old Man goes on shooting under the panel,
+        // and a survivor count that keeps dropping behind "RAID FAILED" is noise.
+        private void Summarise()
+        {
+            if (_summarised || stats == null)
+            {
+                return;
+            }
+
+            _summarised = true;
+
+            var players = 0;
+            var living = 0;
+            var boot = LevelBootstrapper.Current;
+            if (boot != null)
+            {
+                var sensed = boot.SensedPlayers;
+                for (var i = 0; i < sensed.Count; i++)
+                {
+                    players++;
+                    if (sensed[i].IsAlive)
+                    {
+                        living++;
+                    }
+                }
+            }
+
+            var seconds = Mathf.Max(0f, _goal.Duration);
+            stats.text = $"Животных на борту: {_goal.Delivered}/{_goal.Total}\n" +
+                         $"Выжило: {living}/{players}\n" +
+                         $"Время: {(int)(seconds / 60f)}:{(int)(seconds % 60f):00}";
+
+            stats.gameObject.SetActive(true);
+        }
+
+        private void ToHub()
         {
             var session = RaidSession.Active;
             if (session != null)
             {
-                // The reload is the reset: everything latched — the outcome, the
-                // delivered count, who is dead, which doors are open — is scene state,
-                // and LevelBootstrapper builds it from scratch on the way in.
-                session.Restart();
+                // A real scene load, so nothing has to be reset: the outcome, the
+                // delivered count, who is dead and which doors are open are all scene
+                // state, and the next flight builds them from scratch.
+                session.GoToHub();
             }
         }
 
@@ -286,7 +340,7 @@ namespace _Game.Code.UI
                 return;
             }
 
-            // The panel goes, the cursor stays: the lobby is a mouse menu, and the
+            // The panel goes, the cursor stays: the menu is a mouse screen, and the
             // avatar that would otherwise hand the cursor back is about to be destroyed.
             _open = false;
             if (panel != null)
@@ -296,15 +350,9 @@ namespace _Game.Code.UI
 
             ShowCursor(true);
 
-            if (session.IsHost)
-            {
-                // Host migration does not exist (plan decision 5), so the host walking
-                // out takes the raid with them — but the session stays up and everybody
-                // lands in the lobby together rather than being disconnected.
-                session.ReturnToLobby();
-                return;
-            }
-
+            // Host migration does not exist, so the host walking out ends the session
+            // and everybody else finds themselves in the menu through their own
+            // disconnect. Anybody else leaves alone.
             session.Leave();
         }
 

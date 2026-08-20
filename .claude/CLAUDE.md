@@ -6,32 +6,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## The Game
 
-The description of game lies in **GAME.md** file.
+The description of game lies in **`.claude/rules/GAME.md`**.
 
 ## Layout
 
 ```
 rnd-ta/
-├── CLAUDE.md                   ← this file
+├── .claude/
+│   ├── CLAUDE.md               ← this file, loaded every turn
+│   ├── rules/                  ← GAME.md, DD.md, MECHANICS.md, NETCODE.md, CODESTYLE.md, TASKS.MD
+│   └── agents/                 ← the three read-only reviewers
 ├── Assets/
 │   ├── _Game/                  ← everything WE author
-│   │   ├── Code/               ← gameplay scripts, one folder per system
-│   │   │   ├── LevelBootstrapper.cs ← the level's entry point
+│   │   ├── Code/               ← gameplay scripts, one folder per system; namespace mirrors the folder
 │   │   │   ├── App/            ← Bootstrapper.cs (the app's entry point), RaidSession.cs, LobbyRoster.cs, ServerSimulated.cs
 │   │   │   ├── AI/             ← Sight.cs, Hearing.cs, DoorGate.cs, SensedPlayer.cs — shared by every brain
 │   │   │   ├── Audio/          ← FootstepAudio.cs, FootstepBank.cs, FootstepSurface.cs
 │   │   │   ├── Doors/          ← Door.cs, DoorState.cs
-│   │   │   ├── Level/          ← BeamZone.cs, LevelGoal.cs, UfoDrift.cs
+│   │   │   ├── Editor/         ← SceneMenu.cs (Tools → Scenes); editor-only, stripped from builds
+│   │   │   ├── Hub/            ← HubBootstrapper.cs (the hub's entry point), HubMenuUI.cs, RaidLocation.cs — the map's face
+│   │   │   ├── Level/          ← LevelBootstrapper.cs (the level's entry point), BeamZone.cs, LevelGoal.cs, RaidState.cs, UfoDrift.cs
 │   │   │   ├── Noise/          ← NoiseEmitter.cs
 │   │   │   ├── OldMan/         ← OldManBrain.cs, ShotFlash.cs, RifleRig.cs, ShotPellet.cs
 │   │   │   ├── Pets/           ← Pet.cs, PetBrain.cs, PetVoice.cs
 │   │   │   ├── Player/         ← PlayerController.cs, PlayerInteractor.cs, PlayerHands.cs, PlayerAnimator.cs, PlayerNoise.cs, PlayerLife.cs, FirstPersonBody.cs, LocalAvatar.cs, SpectatorCamera.cs, PlayerMotion.cs
 │   │   │   ├── Spawning/       ← SpawnPoint.cs, ActorSpawner.cs
-│   │   │   └── UI/             ← InteractionPromptUI.cs, LevelStatusUI.cs, EndScreenUI.cs, LobbyUI.cs, PlayerLobbyUI.cs, LoadingScreen.cs
+│   │   │   └── UI/             ← InteractionPromptUI.cs, LevelStatusUI.cs, EndScreenUI.cs, MenuView.cs, PlayerLobbyUI.cs, LoadingScreen.cs
 │   │   └── Content/
-│   │       ├── Shared/         ← Session.prefab, LobbyRoster.prefab, RaidState.prefab (spawned, not scene objects) + LoadingScreen.prefab and its images
-│   │       ├── Lobby/          ← PlayerLobby.prefab (one roster row) and its image
-│   │       ├── Scenes/         ← Loading.unity, Lobby.unity, Hub.unity, Level.unity (build order)
+│   │       ├── Shared/         ← Session.prefab, LobbyRoster.prefab, RaidState.prefab (spawned, not scene objects) + LoadingScreen/
+│   │       ├── Hub/            ← LocationButton.prefab (one row of the hub's location list)
+│   │       ├── Lobby/          ← PlayerLobby.prefab (one roster row) and its image — kept unused, see below
+│   │       ├── Scenes/         ← Loading.unity, Menu.unity, Hub.unity, Level.unity (build order)
 │   │       │   └── Level/      ← baked NavMeshData for that scene
 │   │       └── Level/          ← folders only, nothing loose in the root
 │   │           ├── Anchors/    ← PlayerSpawn, PetSpawn, OldmanSpawn, PatrolPoint markers
@@ -50,6 +55,9 @@ rnd-ta/
 
 - **`Assets/_Game/`, `Assets/Settings/` and `Assets/InputSystem_Actions.inputactions` are ours; every other *folder* directly under `Assets/` is an imported pack** — run `ls Assets/` for the current set, it grows with almost every art commit. Treat pack folders as read-only: don't edit or reorganize them, because a reimport wipes the changes. To adapt a pack asset, make a prefab variant or a copy inside `Assets/_Game/`.
 - New gameplay code goes in `Assets/_Game/Code/`. New level content goes in `Assets/_Game/Content/`.
+- **Every doc lives in `.claude/rules/`; the repo root holds no markdown** (moved 2026-08-20). `GAME.md` is the design vocabulary and the history of measured failures, `DD.md` the concept, `MECHANICS.md` the tunables, `NETCODE.md` the replication map, `CODESTYLE.md` the code rules, `TASKS.MD` the user's own task board.
+- **Three scenes have an entry point and each is a scene root named `Bootstrapper`**: `Code/App/Bootstrapper.cs` in `Loading`, `Code/Hub/HubBootstrapper.cs` in `Hub`, `Code/Level/LevelBootstrapper.cs` in `Level`. **A scene's entry point lives in that scene's folder**, so `App/` keeps only what outlives every scene. The flow is `Loading → Menu → Hub → Level → Hub`; `Menu.unity` is the renamed former `Lobby.unity` (same GUID) and is only the way in. Details in `GAME.md`, channels in `NETCODE.md`.
+- **`Content/Lobby/` is deliberately unused since 2026-08-12.** `PlayerLobby.prefab` and `PlayerLobbyUI.cs` outlived the lobby's player list and are kept for the hub's own list; nothing shows them today.
 
 ## Project facts
 
@@ -78,14 +86,14 @@ Worth knowing:
   Removing a `NavMeshSurface` component **deletes its baked `NavMeshData` asset** — the package does this in `NavMeshAssetManager`, without a prompt.
 - **The alien's own avatar does not fit the alien's own prefab — we build our own.** `Model.fbx` names its bones `mixamorig:Hips`, `mixamorig:LeftUpLeg`, … and `ModelAvatar` is built for those names, but the vendor prefab `CuteAlien.prefab` (the ancestor of our `Player.prefab`) renames them to `Hips`, `LeftUpLeg`, … — so the humanoid avatar binds to nothing and **no animation is applied at all**, silently. Measured 2026-08-03: `Animator.GetBoneTransform(Hips)` returned null even with `AlwaysAnimate`. The fix in this project is `Assets/_Game/Content/Level/Player/Player-Avatar.asset`, built with `AvatarBuilder.BuildHumanAvatar` against the renamed skeleton and assigned to `Player.prefab`. Three traps came with it. A humanoid bone's name **must be unique in the whole hierarchy** (the mesh object `Head` had to be renamed to `HeadMesh`, or the build fails with "Ambiguous Transform"). `AvatarBuilder` reports failure only through `avatar.isValid`, with the real reason in the console. And **the skeleton must be described unscaled**: the first `SkeletonBone` entry is the root, and putting the prefab's own `0.1` scale in it makes Unity mis-measure the character — every retargeted pose then sat `0.10 m` too low and the model walked knee-deep in the floor (measured 2026-08-03: feet at `−0.09` instead of `+0.011`). Build the avatar from a probe whose root scale is `1`; the prefab keeps its `0.1` on top. If bones are ever renamed or the rig re-proportioned, rebuild that asset and re-measure the feet.
 - **Almost the whole house is marked Static — anything that has to move must be cleared first.** 901 of `HouseOneFloor`'s 949 objects carry `Everything` static flags. A **Batching Static** renderer is merged into a combined mesh when Play mode starts and then ignores its transform: the object still moves for physics, but the visible geometry stays put. That is how `Corner_3B/Exterior_Door` behaved on 2026-08-03 — measured in Play mode, its collider swung `0.776 m` while its renderer moved `0.000 m`, so the door was open but looked shut. Clearing the flags on the leaf and its five children fixed it. Before animating anything inside the house, check `GameObjectUtility.GetStaticEditorFlags`.
-- **An unfocused editor does not simulate.** With the OS focus elsewhere (e.g. on a chat window driving the editor over MCP), play mode freezes entirely — `Time.time` stands still and nothing moves, which reads as impossible teleports and vanished states between two tool calls. For any MCP-driven play-mode measurement, set `Application.runInBackground = true` first (runtime-only, resets with play mode); discovered at the cost of half an hour on 2026-08-06.
+- **An unfocused editor used not to simulate, and two project settings now say it must.** With the OS focus elsewhere (e.g. on a chat window driving the editor over MCP), play mode froze entirely — `Time.time` stood still and nothing moved, which reads as impossible teleports and vanished states between two tool calls; discovered at the cost of half an hour on 2026-08-06. Fixed for good on 2026-08-12 by `runInBackground: 1` in `ProjectSettings/ProjectSettings.asset` **and** `m_BackgroundBehavior: 2` (ignore focus) in `Assets/InputSystem.inputsettings.asset` — the Input System stops feeding devices on focus loss on its own, so the engine setting alone is not enough. The old per-session `Application.runInBackground = true` is no longer needed; if play mode ever freezes unfocused again, check that both values survived.
 - **Git LFS is active** (`.gitattributes` routes models, textures, audio and other binaries through it). Keep new binary assets under the existing LFS rules rather than adding patterns ad hoc.
-- **Unity YAML merges are probably *not* protected.** `.gitattributes` asks for `merge=unityyamlmerge`, but the driver itself is a local git-config setting that isn't versioned — and it was absent in every scope on this machine as of 2026-08-01. Check with `git config --get merge.unityyamlmerge.driver`; empty means git falls back to a plain text merge on `.unity`/`.prefab`/`.asset`, which corrupts them. Avoid situations that merge scene/prefab changes; if one is unavoidable, say so and let the user resolve it in the editor.
+- **Unity YAML merges are *not* protected.** `.gitattributes` asks for `merge=unityyamlmerge`, but the driver itself is a local git-config setting that isn't versioned — and it is absent in every scope on this machine (re-measured 2026-08-20). Check with `git config --get merge.unityyamlmerge.driver`; empty means git falls back to a plain text merge on `.unity`/`.prefab`/`.asset`, which corrupts them. Avoid situations that merge scene/prefab changes; if one is unavoidable, say so and let the user resolve it in the editor.
 
 ## Working rules
 
 These are load-bearing. Keep them in force even when the task is small.
-- **For codestyle use `CODESTYLE.md`
+- **For codestyle use `.claude/rules/CODESTYLE.md`.**
 - **Don't commit stuff to git.** User can make a commit on his own after they check out your work.
 - **Don't write extensive comments in code.** Use short technical vocabulary and use it only in places where those commentaries are absolutly necessary for understanding code. if a method is called GetPlayersCount and returns players count - it's obvious what it does. Only some hardcoded complicated logic requires descriptions on how it works. This **overrides** "match the surrounding style": much of the existing code carries long narrative comments and XML docs written before this rule — do not copy that density when editing those files, and don't rewrite the old ones either unless the code under them changes.
   - **One or two lines.** A comment states the non-obvious constraint or the measurement, not the story around it. No dates, no bug retellings, no "this used to be X" — that history belongs in `CLAUDE.md` or the design docs.

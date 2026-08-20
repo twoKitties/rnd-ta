@@ -68,8 +68,11 @@ stop at the first hit. Same shape as the "write the minimum that works" ladder i
   tells the session, never the reverse. Call down, raise up: a parent calls its children directly,
   a child raises an event or calls through a registered interface rather than naming its parent's
   type.
-- **The two bootstrappers are the composition roots.** Wiring is a serialized reference or the
-  entry point's properties. There is no DI container and no service locator in this project — do
+- **The three bootstrappers are the composition roots** — `Bootstrapper` (the app),
+  `HubBootstrapper`, `LevelBootstrapper`. **Each lives in its own scene's folder** — `App/`,
+  `Hub/`, `Level/` — never filed together by role, which is what keeps `App/` holding only the
+  things that outlive every scene. Wiring is a serialized reference or the entry point's
+  properties. There is no DI container and no service locator in this project — do
   not add one without saying so first.
 - **Static `Current` / `Active` are lookups, not services.** Get-only, set in `Awake` or
   `OnStartClient`, cleared in `OnDestroy`, and null means "playing alone" rather than failure.
@@ -91,10 +94,14 @@ stop at the first hit. Same shape as the "write the minimum that works" ladder i
   `OnDisable`, `OnDestroy`) → public API → private helpers. No `#region`.
 - **An enum, not a pair of bools** (`PlayerController.State` is the pattern). Two bools admit a
   state that cannot happen, and something will eventually reach it.
-- **[decide] Namespaces.** There are none today and no asmdefs, so nothing but this file marks a
-  boundary — which makes the dependency-direction rule above unenforceable by the compiler.
-  Recommended: `RndTa.<Folder>` mirroring `Code/`, adopted for new files only, with no churn pass
-  over the old ones.
+- **A namespace mirrors the folder path: `_Game.Code.<Folder>`.** One per folder, on every file in
+  `Code/`, no exceptions — `Code/Player/PlayerController.cs` is `_Game.Code.Player`. Nothing is
+  loose at the root of `Code/`, so a bare `_Game.Code` is a file that has not been filed yet.
+  There are still no asmdefs, so the namespace *names* the dependency direction above without
+  enforcing it: the compiler will not catch `App/` reaching into the level.
+  - **`_Game.Code.Editor` shadows `UnityEditor.Editor`.** Inside it an unqualified `Editor` binds
+    to the namespace, so a custom inspector must spell out `UnityEditor.Editor` or the build fails
+    with `CS0118: 'Editor' is a namespace but is used like a type`.
 
 ## Unity API
 
@@ -173,7 +180,8 @@ inventing a parallel mechanism.
   trigger differs.
 - **Replicated state lives on its own server-spawned prefab and the scene object holds a plain
   reference** — `RaidState`, `LobbyRoster`. Never promote a scene object to `NetworkBehaviour`.
-- **One writer per piece of state.** `Cursor.lockState` has exactly two and they are named; the
-  outcome text has exactly one. A second writer is a bug.
+- **One writer per piece of state, and every writer is named.** `Cursor.lockState` has exactly
+  three — `LocalAvatar`, `EndScreenUI`, `HubMenuUI` — and the outcome text has exactly one. An
+  unnamed writer is a bug; adding a named one is a documented decision, not a free action.
 - **Whatever switches something off is what switches it back on, and restores only what it
   changed** — `EndScreenUI.suspendWhileOpen`, `FirstPersonBody`.

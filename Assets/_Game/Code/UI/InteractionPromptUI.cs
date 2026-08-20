@@ -38,7 +38,19 @@ namespace _Game.Code.UI
             }
 
             var target = interactor.Current;
-            Show(target.Exists ? $"[{_key}] {target.Verb} {target.Subject}" : string.Empty);
+            if (!target.Exists)
+            {
+                Show(string.Empty);
+                return;
+            }
+
+            // Some targets are their own name — a map row reads "[E] Дом в пригороде",
+            // not "[E]  Дом в пригороде".
+            var body = string.IsNullOrEmpty(target.Verb)
+                ? target.Subject
+                : $"{target.Verb} {target.Subject}";
+
+            Show($"[{_key}] {body}");
         }
 
         private void Show(string text)

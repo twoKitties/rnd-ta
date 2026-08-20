@@ -86,8 +86,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6509e1f54a3782247b6a011d131afdc2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.App.RaidSession
-  lobbyScene: Lobby
-  levelScene: Level
+  menuScene: Menu
+  hubScene: Hub
   port: 7770
   hostAddress: 127.0.0.1
   lobbyRosterPrefab: {fileID: 5182059135105534431, guid: 9e297224c66152642aab6e3423ef8d13, type: 3}

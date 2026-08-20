@@ -163,7 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04ab7acd1b27f474d9175f9ade59a0e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.App.Bootstrapper
-  firstScene: Lobby
+  firstScene: Menu
   sessionPrefab: {fileID: 4323903077379937797, guid: ecdea46fc2952f14cb0edf0f021619d1, type: 3}
   loadingScreenPrefab: {fileID: 5025204626650797747, guid: e570a7feee6c2904eba9abfa54ab2e43, type: 3}
 --- !u!1660057539 &9223372036854775807

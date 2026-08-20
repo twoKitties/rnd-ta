@@ -2660,7 +2660,7 @@ GameObject:
   - component: {fileID: 1220818869}
   - component: {fileID: 1220818873}
   m_Layer: 5
-  m_Name: LobbyUI
+  m_Name: MenuUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2771,23 +2771,18 @@ MonoBehaviour:
   _exitButton: {fileID: 1454025702}
   _backLobbyButton: {fileID: 2006112931}
   _backSettingsButton: {fileID: 1738836713}
-  _backOptionsButton: {fileID: 1569376864}
   _hostButton: {fileID: 496490146}
   _connectButton: {fileID: 1799583179}
   _mainMenuPanel: {fileID: 1212703000}
   _lobbyPanel: {fileID: 561425725}
   _settingsPanel: {fileID: 776021551}
-  _playerList: {fileID: 261533870}
-  _playerLobbyUIPrefab: {fileID: 3335004797880157443, guid: de9513510871bf64e8df70b36336d6db, type: 3}
   _addressField: {fileID: 2065779424}
-  _startButton: {fileID: 2116525813}
   _optionsPanel: {fileID: 372266260}
   _addressPanel: {fileID: 1247259625}
   _playersPanel: {fileID: 1423400997}
   _connectConfirmButton: {fileID: 1988688364}
   _backAddressButton: {fileID: 29688865}
   _connectingIndicator: {fileID: 1860945100}
-  _hostAddressLabel: {fileID: 582336643}
   _popup: {fileID: 485192595}
   _popupText: {fileID: 1802468424}
   _popupOkButton: {fileID: 1103521413}
@@ -4877,7 +4872,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04ab7acd1b27f474d9175f9ade59a0e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_Game.Code.App.Bootstrapper
-  firstScene: Lobby
+  firstScene: Menu
   sessionPrefab: {fileID: 4323903077379937797, guid: ecdea46fc2952f14cb0edf0f021619d1, type: 3}
   loadingScreenPrefab: {fileID: 0}
 --- !u!4 &2017624548

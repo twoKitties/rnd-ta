@@ -2,6 +2,7 @@ using _Game.Code.Player;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using UnityEngine;
 
 namespace _Game.Code.Level
 {
@@ -25,6 +26,10 @@ namespace _Game.Code.Level
         private readonly SyncVar<int> _total = new SyncVar<int>();
         private readonly SyncVar<bool> _isWon = new SyncVar<bool>();
         private readonly SyncVar<bool> _isLost = new SyncVar<bool>();
+        private readonly SyncVar<float> _duration = new SyncVar<float>();
+
+        // Server-side only: the clock the duration above is measured against.
+        private float _startedAt;
 
         /// <summary>
         /// The raid that is running, or null when there is no networking at all — and
@@ -38,8 +43,20 @@ namespace _Game.Code.Level
         public bool IsWon => _isWon.Value;
         public bool IsLost => _isLost.Value;
 
+        /// <summary>How long the raid took, seconds. Meaningful once it is over.</summary>
+        public float Duration => _duration.Value;
+
         /// <summary>True where the decisions are taken. Safe to ask any time.</summary>
         public bool IsAuthority => IsServerInitialized;
+
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+
+            // This object is spawned as the level is laid out, so its own lifetime is
+            // the raid's — no separate start signal is needed.
+            _startedAt = Time.time;
+        }
 
         public override void OnStartClient()
         {
@@ -119,6 +136,7 @@ namespace _Game.Code.Level
 
             _isWon.Value = won;
             _isLost.Value = lost;
+            _duration.Value = Time.time - _startedAt;
         }
     }
 }

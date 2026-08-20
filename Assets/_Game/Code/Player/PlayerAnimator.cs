@@ -32,10 +32,12 @@ namespace _Game.Code.Player
         private PlayerController _controller;
         private int _carryLayer = -1;
         private float _carryWeight;
+        private bool _dead;
 
         // Hashes, not state: nothing per-player lives here (MECHANICS.md 7.3).
         private static readonly int SpeedParameter = Animator.StringToHash("Speed");
         private static readonly int CarryPoseParameter = Animator.StringToHash("CarryPose");
+        private static readonly int DeathParameter = Animator.StringToHash("Death");
 
         private void Awake()
         {
@@ -58,13 +60,33 @@ namespace _Game.Code.Player
 
         private void Update()
         {
-            if (animator == null)
+            if (animator == null || _dead)
             {
                 return;
             }
 
             animator.SetFloat(SpeedParameter, _controller.Speed, damping, Time.deltaTime);
             UpdateCarryPose();
+        }
+
+        /// <summary>Plays the death state once and freezes the animator on it (no respawn, MECHANICS.md 3.7).</summary>
+        public void Die()
+        {
+            if (_dead || animator == null)
+            {
+                return;
+            }
+
+            _dead = true;
+            animator.SetTrigger(DeathParameter);
+
+            // Update stops here, so the carry layer would hold the arms around a pet
+            // that is already gone: the release happens in the same frame.
+            if (_carryLayer >= 0)
+            {
+                _carryWeight = 0f;
+                animator.SetLayerWeight(_carryLayer, 0f);
+            }
         }
 
         private void UpdateCarryPose()

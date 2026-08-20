@@ -9,13 +9,14 @@ using FishNet.Managing.Scened;
 using FishNet.Object;
 using FishNet.Transporting;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace _Game.Code.Hub
 {
     /// <summary>
     /// The hub's entry point: the saucer between raids. It spawns the avatars and hands
-    /// the local one to the hub's menu, and that is all — there is no AI here, no
-    /// navmesh and no outcome to judge.
+    /// the map to the local one, and that is all — there is no AI here, no navmesh and
+    /// no outcome to judge.
     ///
     /// Unlike <see cref="LevelBootstrapper"/> it does not wait for everybody. An avatar
     /// belongs to one connection, so the right moment to make it is that connection
@@ -30,7 +31,8 @@ namespace _Game.Code.Hub
         [Header("Scene")]
         [SerializeField] private Transform spawnsRoot;
 
-        [SerializeField] private HubMenuUI hubMenu;
+        [Tooltip("The map's raycaster, handed to the local avatar so Interact can press it.")]
+        [SerializeField] private GraphicRaycaster map;
 
         /// <summary>
         /// The hub while it is loaded, or null when we are not in it. Static for the
@@ -129,18 +131,18 @@ namespace _Game.Code.Hub
             }
 
             var local = avatar.GetComponent<LocalAvatar>();
-            if (local == null || !local.IsLocal || hubMenu == null)
+            if (local == null || !local.IsLocal)
             {
                 return;
             }
 
-            hubMenu.Bind(avatar);
+            BindMap(avatar, map);
         }
 
         /// <summary>An avatar has gone. Only ours is worth reacting to.</summary>
         public void RemovePlayer(GameObject avatar)
         {
-            if (avatar == null || hubMenu == null)
+            if (avatar == null)
             {
                 return;
             }
@@ -148,7 +150,18 @@ namespace _Game.Code.Hub
             var local = avatar.GetComponent<LocalAvatar>();
             if (local != null && local.IsLocal)
             {
-                hubMenu.Bind(null);
+                BindMap(avatar, null);
+            }
+        }
+
+        // The map is a scene object, so a spawned prefab cannot reference it up front —
+        // the same reason LevelBootstrapper hands the level goal over.
+        private static void BindMap(GameObject avatar, GraphicRaycaster raycaster)
+        {
+            var interactor = avatar.GetComponent<PlayerInteractor>();
+            if (interactor != null)
+            {
+                interactor.BindMap(raycaster);
             }
         }
 

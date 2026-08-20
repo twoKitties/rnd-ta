@@ -1,7 +1,10 @@
+using System.Collections.Generic;
 using _Game.Code.Doors;
 using _Game.Code.Level;
 using _Game.Code.Pets;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace _Game.Code.Player
 {
@@ -9,7 +12,8 @@ namespace _Game.Code.Player
     {
         None,
         Pet,
-        Door
+        Door,
+        Map
     }
 
     /// <summary>
@@ -74,7 +78,11 @@ namespace _Game.Code.Player
         private Pet _pet;
         private Door _door;
         private LevelGoal _goal;
+        private GraphicRaycaster _map;
+        private Button _mapButton;
         private readonly Collider[] _nearbyPets = new Collider[8];
+        private readonly List<RaycastResult> _mapHits = new List<RaycastResult>();
+        private PointerEventData _mapPointer;
 
         private void Awake()
         {
@@ -90,6 +98,15 @@ namespace _Game.Code.Player
             _goal = goal;
         }
 
+        /// <summary>
+        /// The hub's map, handed over by HubBootstrapper the same way. Null everywhere
+        /// else, which is what keeps the UI query out of the level.
+        /// </summary>
+        public void BindMap(GraphicRaycaster map)
+        {
+            _map = map;
+        }
+
         // Switched off on death (PlayerLife). Resolve stops running, so the last
         // target would stay on offer and the HUD would keep showing "[E] Grab Kitty"
         // over a corpse — the exact "the button does nothing" reading the prompt was
@@ -98,11 +115,19 @@ namespace _Game.Code.Player
         private void OnDisable()
         {
             Current = default;
+
+            // The EventSystem selection is one per process and outlives this scene.
+            _mapButton = null;
+            Highlight(null);
         }
 
         private void Update()
         {
             Resolve();
+
+            // Which row the crosshair is on has to be visible on the map itself: the
+            // HUD line names it, but with several locations the player needs to see it.
+            Highlight(_mapButton);
 
             if (!_controller.Intent.Interact)
             {
@@ -134,6 +159,10 @@ namespace _Game.Code.Player
                 case InteractionKind.Door:
                     _door.Use(transform);
                     break;
+
+                case InteractionKind.Map:
+                    _mapButton.onClick.Invoke();
+                    break;
             }
         }
 
@@ -141,6 +170,7 @@ namespace _Game.Code.Player
         {
             _pet = null;
             _door = null;
+            _mapButton = null;
 
             if (hands == null || lookSource == null)
             {
@@ -169,6 +199,15 @@ namespace _Game.Code.Player
             if (_door != null)
             {
                 Current = new InteractionTarget(InteractionKind.Door, _door.IsOpen ? "Close" : "Open", "door");
+                return;
+            }
+
+            // Last, and only in the hub: _map is null everywhere else, so the level
+            // pays one null check rather than a UI raycast.
+            _mapButton = FindMapButton();
+            if (_mapButton != null)
+            {
+                Current = new InteractionTarget(InteractionKind.Map, string.Empty, LabelOf(_mapButton));
                 return;
             }
 
@@ -233,6 +272,68 @@ namespace _Game.Code.Player
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// The map row under the crosshair. A UI query rather than a physics one — the
+        /// map is a world-space canvas and its rows have no colliders.
+        /// </summary>
+        private Button FindMapButton()
+        {
+            if (_map == null || EventSystem.current == null)
+            {
+                return null;
+            }
+
+            // Reused: a fresh PointerEventData every frame is an allocation per avatar.
+            if (_mapPointer == null)
+            {
+                _mapPointer = new PointerEventData(EventSystem.current);
+            }
+
+            _mapPointer.position = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            _mapHits.Clear();
+            _map.Raycast(_mapPointer, _mapHits);
+
+            for (var i = 0; i < _mapHits.Count; i++)
+            {
+                var button = _mapHits[i].gameObject.GetComponentInParent<Button>();
+                if (button == null || !button.IsInteractable())
+                {
+                    continue;
+                }
+
+                if (Vector3.Distance(lookSource.position, button.transform.position) > reach)
+                {
+                    return null;
+                }
+
+                return button;
+            }
+
+            return null;
+        }
+
+        private static string LabelOf(Button button)
+        {
+            var text = button.GetComponentInChildren<Text>();
+            return text == null ? string.Empty : text.text;
+        }
+
+        private static void Highlight(Button button)
+        {
+            if (EventSystem.current == null)
+            {
+                return;
+            }
+
+            var target = button == null ? null : button.gameObject;
+            if (EventSystem.current.currentSelectedGameObject == target)
+            {
+                return;
+            }
+
+            EventSystem.current.SetSelectedGameObject(target);
         }
     }
 }

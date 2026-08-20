@@ -24,7 +24,7 @@ rnd-ta/
 │   │   │   ├── Audio/          ← FootstepAudio.cs, FootstepBank.cs, FootstepSurface.cs
 │   │   │   ├── Doors/          ← Door.cs, DoorState.cs
 │   │   │   ├── Editor/         ← SceneMenu.cs (Tools → Scenes); editor-only, stripped from builds
-│   │   │   ├── Hub/            ← HubBootstrapper.cs (the hub's entry point), HubMenuUI.cs, RaidLocation.cs
+│   │   │   ├── Hub/            ← HubBootstrapper.cs (the hub's entry point), HubMenuUI.cs, RaidLocation.cs — the map's face
 │   │   │   ├── Level/          ← LevelBootstrapper.cs (the level's entry point), BeamZone.cs, LevelGoal.cs, RaidState.cs, UfoDrift.cs
 │   │   │   ├── Noise/          ← NoiseEmitter.cs
 │   │   │   ├── OldMan/         ← OldManBrain.cs, ShotFlash.cs, RifleRig.cs, ShotPellet.cs

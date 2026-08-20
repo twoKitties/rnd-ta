@@ -1,3 +1,4 @@
+using _Game.Code.Level;
 using _Game.Code.Player;
 using FishNet.Connection;
 using FishNet.Object;
@@ -45,6 +46,12 @@ namespace _Game.Code.Pets
 
         [Tooltip("Where the animal lands when released, metres in front of the carrier.")]
         [SerializeField] private float dropDistance = 0.6f;
+
+        [Tooltip("Seconds to rise from the release point to the saucer's base once delivered.")]
+        [SerializeField] private float riseDuration = 2f;
+
+        [Tooltip("Offset from the saucer's transform to its base, world metres.")]
+        [SerializeField] private Vector3 riseTargetOffset = new Vector3(0f, -0.3f, 0f);
 
         // Floor and walls, for finding ground under the drop spot.
         [SerializeField] private LayerMask groundMask;
@@ -136,6 +143,11 @@ namespace _Game.Code.Pets
         // reference goes fake-null while the animal is still mid-air with its
         // agent off. This flag is what notices and puts it down.
         private bool _isCarried;
+
+        // Delivered but not yet gone: frozen, rising to the saucer's base.
+        private bool _isRising;
+        private float _riseStartTime;
+        private Vector3 _riseFrom;
 
         private void Awake()
         {
@@ -277,7 +289,7 @@ namespace _Game.Code.Pets
         {
             if (!IsReplicated)
             {
-                ApplyDeliver();
+                BeginRise();
                 return;
             }
 
@@ -285,6 +297,58 @@ namespace _Game.Code.Pets
             {
                 // Every peer, this one included, reacts in OnDeliveredChanged.
                 _delivered.Value = true;
+            }
+        }
+
+        // Freeze and start the rise. Same shutdown as ApplyCarry: nothing else may
+        // drive the transform while it climbs to the saucer.
+        private void BeginRise()
+        {
+            if (_isRising)
+            {
+                return;
+            }
+
+            _isRising = true;
+            _riseStartTime = Time.time;
+            _riseFrom = transform.position;
+
+            if (_agent != null)
+            {
+                _agent.enabled = false;
+            }
+
+            if (_capsule != null)
+            {
+                _capsule.enabled = false;
+            }
+
+            if (_animator != null)
+            {
+                _animator.SetFloat(VertParameter, 0f);
+                _animator.SetFloat(StateParameter, 0f);
+            }
+        }
+
+        // Sampled every frame rather than cached: UfoDrift bobs and spins the hull.
+        private void TickRise()
+        {
+            var t = riseDuration <= 0f ? 1f : Mathf.Clamp01((Time.time - _riseStartTime) / riseDuration);
+
+            // Moved only where it is simulated: NetworkTransform carries the climb to
+            // everybody else, and a second local lerp would fight the wire. Every peer
+            // still runs the clock, so the animal leaves the level at the same moment.
+            if (IsAuthority)
+            {
+                var eased = t * t * (3f - 2f * t);
+                var hull = UfoDrift.Current == null ? _riseFrom : UfoDrift.Current.position;
+                transform.position = Vector3.Lerp(_riseFrom, hull + riseTargetOffset, eased);
+            }
+
+            if (t >= 1f)
+            {
+                _isRising = false;
+                ApplyDeliver();
             }
         }
 
@@ -305,7 +369,7 @@ namespace _Game.Code.Pets
         {
             if (next)
             {
-                ApplyDeliver();
+                BeginRise();
             }
         }
 
@@ -405,6 +469,12 @@ namespace _Game.Code.Pets
         // frame behind and shiver.
         private void LateUpdate()
         {
+            if (_isRising)
+            {
+                TickRise();
+                return;
+            }
+
             if (!_isCarried)
             {
                 return;

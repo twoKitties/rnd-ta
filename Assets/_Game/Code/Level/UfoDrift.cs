@@ -26,12 +26,24 @@ namespace _Game.Code.Level
                  "is Y — the model is flat in Y (10.54 x 5.75 x 10.57).")]
         [SerializeField] private float spinDegreesPerSecond = 6f;
 
+        /// <summary>The saucer's transform, for sampling its live (moving) position.</summary>
+        public static Transform Current { get; private set; }
+
         private Vector3 _origin;
 
         private void Awake()
         {
             // Where the saucer was placed in the scene is the height it hovers around.
             _origin = transform.position;
+            Current = transform;
+        }
+
+        private void OnDestroy()
+        {
+            if (Current == transform)
+            {
+                Current = null;
+            }
         }
 
         private void Update()
